@@ -35,6 +35,13 @@ class NXTopo(nx.Graph):
                     result.add(s)
         return list(result)
 
+    def edge_ports(self,sid):
+        result = set()
+        for x in self.neighbors(sid):
+            if not self.node[x]['isSwitch']:
+                result.add(self.node[sid]['ports'][x])
+        return list(result)
+
     def finalize(self):
         # make mininet topo
         topo = Topo()
