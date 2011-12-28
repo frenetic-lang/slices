@@ -15,7 +15,7 @@ verification_stubs.py - DEPRECATED?
 QUICKSTART
 
 (1) Navigate to noxcore/build/src/nox/coreapps/examples and add the
-following XML snippet to meta.xml 
+following snippet of XML to meta.xml:
 
    <component>
     <name>UpdateApp</name>
@@ -25,7 +25,7 @@ following XML snippet to meta.xml
     <python>nox.coreapps.examples.update_app</python>
   </component>
 
-  This tells NOX where to find the module identified by "UpdateApp"
+This tells NOX where to find the module identified by "UpdateApp"
 
 (2) Symbolically link update_app.py from this directory
  
@@ -33,10 +33,16 @@ following XML snippet to meta.xml
 
 (3) Execute run.py on a module in the examples directory. For example
 
-  ./run.py routing
+  sudo ./run.py routing
 
 Should run a demo showing a per-packet consistent update between two
 shortest-path routing policies. 
+
+To see the controller output, type 
+
+  c0 cat /tmp/c0.log 
+
+from the command-line
 
 FOR FRENTIC UPDATE HACKERS
 
@@ -54,23 +60,11 @@ policies used in each update.
 
 The routing.py file also defines a function go. By default, executing
 
-  run.py MODULE
+  sudo run.py MODULE
 
 invokes go(1,2) from MODULE. Other behaviors canbe obtained by passing
 a value for the --function command-line argument. For instance,
 
-  run.py routing --function run 1
+  sudo run.py routing --function run 1
 
-invokes run(1). 
-
-Note that the function will not be invoked until all of the switches
-in the topology specified by initial_topology() have come online. To
-boot a topology, execute a command like this:
-
-  sudo mn \
-    --custom routing_topo.py \
-    --topo routing \
-    --arp \
-    --controller=remote \
-    --ip=127.0.0.1 \
-    --port=6633
+will invoke run(1) instead.
