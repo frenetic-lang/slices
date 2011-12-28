@@ -1,0 +1,76 @@
+OVERVIEW
+
+This directory contains code for Frenetic's policy update
+mechanism. The key files are as follows:
+
+exampes/ - directory of modules
+nxtopo.py - class representing topologies
+policy.py - class representing policies
+print_smv.py - Kripke structure generating functions
+run.py - top-level script
+update_app.py - update NOX component
+update_lib.py - update mechanism implementations
+verification_stubs.py - DEPRECATED?
+
+QUICKSTART
+
+(1) Navigate to noxcore/build/src/nox/coreapps/examples and add the
+following XML snippet to meta.xml 
+
+   <component>
+    <name>UpdateApp</name>
+    <dependency>
+      <name>python</name>
+    </dependency>
+    <python>nox.coreapps.examples.update_app</python>
+  </component>
+
+  This tells NOX where to find the module identified by "UpdateApp"
+
+(2) Symbolically link update_app.py from this directory
+ 
+  ln -s ~/frenetic-code/updates/update_app.py . 
+
+(3) Execute run.py on a module in the examples directory. For example
+
+  ./run.py routing
+
+Should run a demo showing a per-packet consistent update between two
+shortest-path routing policies. 
+
+FOR FRENTIC UPDATE HACKERS
+
+If you check out routing.py, you'll notice that it defines a number of
+lists:
+
+  topologies
+  initial_topology
+  policy
+  properties
+  
+We structure things in this way so that external tools, not being run
+through NOX (such as the model checker) can access the topologies and
+policies used in each update. 
+
+The routing.py file also defines a function go. By default, executing
+
+  run.py MODULE
+
+invokes go(1,2) from MODULE. Other behaviors canbe obtained by passing
+a value for the --function command-line argument. For instance,
+
+  run.py routing --function run 1
+
+invokes run(1). 
+
+Note that the function will not be invoked until all of the switches
+in the topology specified by initial_topology() have come online. To
+boot a topology, execute a command like this:
+
+  sudo mn \
+    --custom routing_topo.py \
+    --topo routing \
+    --arp \
+    --controller=remote \
+    --ip=127.0.0.1 \
+    --port=6633
