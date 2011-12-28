@@ -62,9 +62,9 @@ The routing.py file also defines a function go. By default, executing
 
   sudo run.py MODULE
 
-invokes go(1,2) from MODULE. Other behaviors canbe obtained by passing
+invokes main() from MODULE. Other behaviors canbe obtained by passing
 a value for the --function command-line argument. For instance,
 
-  sudo run.py routing --function run 1
+  sudo run.py routing --function go 1 2
 
-will invoke run(1) instead.
+will invoke go(1,2) instead.
