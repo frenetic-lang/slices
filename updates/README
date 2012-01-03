@@ -10,7 +10,7 @@ print_smv.py - Kripke structure generating functions
 run.py - top-level script
 update_app.py - update NOX component
 update_lib.py - update mechanism implementations
-verification_stubs.py - DEPRECATED?
+verification.py - CTL model checking of network properties
 
 QUICKSTART
 
@@ -31,7 +31,10 @@ This tells NOX where to find the module identified by "UpdateApp"
  
   ln -s ~/frenetic-code/updates/update_app.py . 
 
-(3) Execute run.py on a module in the examples directory. For example
+(3) Install NuSMV -- see INSTALLING NuSMV below.  Skip this step if you
+    do not intend to run any verification examples.
+
+(4) Execute run.py on a module in the examples directory. For example
 
   sudo ./run.py routing
 
@@ -43,6 +46,39 @@ To see the controller output, type
   c0 cat /tmp/c0.log 
 
 from the command-line
+
+
+INSTALLING NuSMV
+
+    (1) Download the NuSMV source from:
+
+            http://nusmv.fbk.eu/bin/download_src2-v2.cgi 
+
+        (Tested with NuSMV-2.5.4)
+
+    (2) Install bison and flex:
+
+            sudo apt-get install bison
+            sudo apt-get install flex
+
+    (3) Unpack NuSMV, then cd into the unpacked directory.
+
+    (4) Run the following commands to build cudd, zchaff, and NuSMV:
+
+            cd cudd-2.4.1.1
+            make
+            cd ../zchaff
+            ./build.sh
+            cd ../nusmv
+            ./configure --enable-zchaff
+            make
+            sudo make install
+            
+    (5) You should now be able to run NuSMV:
+
+            which NuSMV
+            NuSMV -h
+
 
 FOR FRENTIC UPDATE HACKERS
 
