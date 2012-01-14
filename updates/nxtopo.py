@@ -87,9 +87,14 @@ class NXTopo(nx.Graph):
         # backpatch ports into original graph
         for x in self.nodes():
             self.node[x]['ports'] = {}
-            for y in self.neighbors(x):               
-                self.node[x]['ports'][y] = topo.port(x,y)[0]
+            self.node[x]['port'] = {}            
+            for y in self.neighbors(x):
+                x_port, y_port = topo.port(x,y)
+                self.node[x]['ports'][y] = x_port
+                # Support indexing in by port to get neighbor switch/port                
+                self.node[x]['port'][x_port] = (y, y_port)
 
+        
         topo.enable_all()
         self.topo = topo        
         self.finalized = True
