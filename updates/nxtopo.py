@@ -103,6 +103,9 @@ class NXTopo(nx.Graph):
         assert self.finalized
         return self.copy()
 
+    # This differs from the normal NX.Graph subgraph() in that we need
+    # to be very careful in what node attributes we propagate
+    # over. For the moment, I propagate all of them. 
     def subgraph(self, nbunch):
         """Return the subgraph induced on switches in nbunch.
 
@@ -139,6 +142,9 @@ class NXTopo(nx.Graph):
                     Hnbrs[nbr]=d
                     H_adj[nbr][n]=d
         H.graph=self.graph
+        # Can't call finalize() here because the node attributes are
+        # shared w/ the parent graph.
+        H.finalized = True
         return H
 
     def mininet_topo(self):
