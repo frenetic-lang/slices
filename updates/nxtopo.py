@@ -103,6 +103,44 @@ class NXTopo(nx.Graph):
         assert self.finalized
         return self.copy()
 
+    def subgraph(self, nbunch):
+        """Return the subgraph induced on switches in nbunch.
+
+        The induced subgraph of the graph contains the nodes in nbunch
+        and the edges between those nodes.
+
+        Parameters
+        ----------
+        nbunch : list, iterable
+            A container of nodes which will be iterated through once.
+
+        Returns
+        -------
+        G : NXTopo
+            A subgraph of the graph with the same edge attributes.
+        """
+        nbunch = list(nbunch) + self.hosts()        
+        bunch =self.nbunch_iter(nbunch)
+        # create new graph and copy subgraph into it
+        H = NXTopo()
+        # copy node and attribute dictionaries
+        for n in bunch:
+            H.node[n]=self.node[n]
+        # namespace shortcuts for speed
+        H_adj=H.adj
+        self_adj=self.adj
+        # add nodes and edges (undirected method)
+        for n in H.node:
+            Hnbrs={}
+            H_adj[n]=Hnbrs
+            for nbr,d in self_adj[n].items():
+                if nbr in H_adj:
+                    # add both representations of edge: n-nbr and nbr-n
+                    Hnbrs[nbr]=d
+                    H_adj[nbr][n]=d
+        H.graph=self.graph
+        return H
+
     def mininet_topo(self):
         assert self.finalized
         return self.topo
