@@ -72,6 +72,9 @@ class Slice:
             edge_policy: set of (edge_port, predicate) pairs, only packets
                 entering the edge port that satisfy the predicate will be allowed to
                 pass
+        
+        Note that because we need to have the ports in both topologies be
+        defined, only finalized NXTopo objects will work for creating a slice.
         """
         self.l_topo = logical_topology
         self.p_topo = physical_topology
