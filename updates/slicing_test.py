@@ -28,17 +28,17 @@
 # /updates/Slice.py                                                            #
 # Tests for Slice, the data structure to represent virtual network slices      #
 ################################################################################
-import Slice
+import slicing
 import unittest
 
 class TestSlice(unittest.TestCase):
     def test_is_injective(self):
-        self.assertTrue(Slice.is_injective({}))
-        self.assertTrue(Slice.is_injective({1:1, 2:2, 3:3, 4:4}))
-        self.assertTrue(Slice.is_injective({1:4, 2:5, 3:2, 4:7}))
+        self.assertTrue(slicing.is_injective({}))
+        self.assertTrue(slicing.is_injective({1:1, 2:2, 3:3, 4:4}))
+        self.assertTrue(slicing.is_injective({1:4, 2:5, 3:2, 4:7}))
 
     def test_not_is_injective(self):
-        self.assertFalse(Slice.is_injective({1:1, 2:1}))
-        self.assertFalse(Slice.is_injective({1:1, 2:2, 3:3, 4:4, 5:3}))
-        self.assertFalse(Slice.is_injective({1:1, 2:2, 3:3, 4:2, 5:3}))
-        self.assertFalse(Slice.is_injective({1:1, 2:2, 3:3, 4:3, 5:3}))
+        self.assertFalse(slicing.is_injective({1:1, 2:1}))
+        self.assertFalse(slicing.is_injective({1:1, 2:2, 3:3, 4:4, 5:3}))
+        self.assertFalse(slicing.is_injective({1:1, 2:2, 3:3, 4:2, 5:3}))
+        self.assertFalse(slicing.is_injective({1:1, 2:2, 3:3, 4:3, 5:3}))
