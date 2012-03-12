@@ -47,19 +47,19 @@ class Bottom(Predicate):
     """The always-false predicate."""
     pass
 
-HEADER_FIELDS = set (["switch",
-                      "inport",
-                      "srcmac",
-                      "dstmac",
-                      "ethtype",
-                      "srcip",
-                      "dstip",
-                      "vlan",
-                      "protocol",
-                      "srcport",
-                      "dstport",
-                      "srcip",
-                      "dstip" ])
+HEADER_FIELDS = set (['switch',
+                      'inport',
+                      'srcmac',
+                      'dstmac',
+                      'ethtype',
+                      'srcip',
+                      'dstip',
+                      'vlan',
+                      'protocol',
+                      'srcport',
+                      'dstport',
+                      'srcip',
+                      'dstip' ])
 
 class Header(Predicate):
     """A predicate representing matching a header with a wildcard pattern.
@@ -76,6 +76,11 @@ class Header(Predicate):
         self.field = field
         self.pattern = pattern
 
+def on_port(switch, port):
+    """Return a predicate matching packets on switch and port."""
+    return Intersection(Header('switch', switch),
+                        Header('port', port))
+
 # Compound predicates
 class Union(Predicate):
     """A predicate representing the union of two predicates."""
@@ -87,6 +92,15 @@ class Union(Predicate):
         """
         self.left = left
         self.right = right
+
+def nary_union(predicates):
+    if len(predicates) == 0:
+        return None
+    else:
+        base = predicates[0]
+        for p in predicates[1:]:
+            base = Union(p, base)
+        return base
 
 class Intersection(Predicate):
     """A predicate representing the intersection of two predicates."""

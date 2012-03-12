@@ -106,7 +106,7 @@ class Slice:
                 the physical topology, must be injective
             port_map: mapping from ports in the logical topology to ports in the
                 physical topology, must be injective
-            edge_policy: set of (edge_port, predicate) pairs, only packets
+            edge_policy: set of ((switch, port), predicate) pairs, only packets
                 entering the edge port that satisfy the predicate will be allowed to
                 pass
 
