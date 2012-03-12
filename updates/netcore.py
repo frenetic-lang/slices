@@ -47,8 +47,7 @@ class Bottom(Predicate):
     """The always-false predicate."""
     pass
 
-HEADER_FIELDS = set (['switch',
-                      'inport',
+HEADER_FIELDS = set (['loc', # See Header for special note about this value
                       'srcmac',
                       'dstmac',
                       'ethtype',
@@ -71,7 +70,9 @@ class Header(Predicate):
         """
         ARGS:
             field: header field to match pattern against
-            pattern: (possibly) wildcarded bitstring
+            pattern: (possibly) wildcarded bitstring, except in the case of loc,
+                where it's (switch, port), where both are ints, with 0
+                representing a wildcard.
         """
         self.field = field
         self.pattern = pattern
@@ -126,14 +127,16 @@ class Difference(Predicate):
 
 class Action:
     """Description of a forwarding action, with possible modification."""
-    def __init__(self, port, modify=dict()):
+    def __init__(self, switch, port, modify=dict()):
         """
         ARGS:
+            switch: switch on which the port lives
             port: port to which to forward packet
             modify: dictionary of header fields to wildcarded strings, those
                 fields in the packet will be overwritten by non-wildcard bits in
                 the corresponding string.
         """
+        self.switch = switch
         self.port = port
         self.modify = modify
 
