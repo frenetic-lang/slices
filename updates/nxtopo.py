@@ -32,7 +32,7 @@ from mininet.topo import Topo, Node
 import networkx as nx
 
 class NXTopo(nx.Graph):
-
+    
     def __init__(self):
         super(NXTopo, self).__init__()
         self.finalized=False

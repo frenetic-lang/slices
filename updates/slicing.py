@@ -68,8 +68,8 @@ def policy_is_total(edge_policy, topo):
             return False #Do we want this?
         port_set.add(edge_port)
     for switch in topo.edge_switches():
-        for port in topo.edge_ports(switch.sid):
-            if not port in port_set: #check on edge ports, not 'edges'
+        for port in topo.edge_ports(switch.sid): #How do we access the sid?
+            if not port in port_set:
                 return False
     return True
 
