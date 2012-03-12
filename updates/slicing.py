@@ -39,12 +39,8 @@ def is_injective(mapping):
     RETURNS:
         True if mapping is injective, False otherwise
     """
-    elem_set = set()
-    for elem in mapping.keys():
-        if elem in elem_set:
-            return False
-        elem_set.add(elem)
-    return True
+    codomain = set(mapping.values())
+    return len(mapping) == len(codomain)
 
 def policy_is_total(edge_policy, topo):
     """Determine if an edge policy covers all edge ports.
