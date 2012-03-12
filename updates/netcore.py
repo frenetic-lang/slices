@@ -194,7 +194,7 @@ class PrimitivePolicy(Policy):
             predicate: predicate under which to apply actions
             actions: list of actions to apply to packets which match predicate,
                 all actions are applied, resulting in potentially multiple
-                packets.
+                packets.  Note that this may be the empty list.
         """
         self.predicate = predicate
         self.actions = actions
