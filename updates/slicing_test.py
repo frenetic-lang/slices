@@ -42,3 +42,6 @@ class TestSlice(unittest.TestCase):
         self.assertFalse(slicing.is_injective({1:1, 2:2, 3:3, 4:4, 5:3}))
         self.assertFalse(slicing.is_injective({1:1, 2:2, 3:3, 4:2, 5:3}))
         self.assertFalse(slicing.is_injective({1:1, 2:2, 3:3, 4:3, 5:3}))
+
+if __name__ == '__main__':
+    unittest.main()
