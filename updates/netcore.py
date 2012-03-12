@@ -35,7 +35,7 @@ from abc import ABCMeta, abstractmethod
 class Predicate:
     """Top-level abstract class for predicates."""
     __metaclass__ = ABCMeta
-    
+
     @abstractmethod
     def get_physical_predicate(self, port_map):
         pass
@@ -68,7 +68,7 @@ HEADER_FIELDS = set (['loc', # See Header for special note about this value
 
 class Header(Predicate):
     """A predicate representing matching a header with a wildcard pattern.
-    
+
     Matches a header against a wildcard.  Note that "header" fields also include
     switch and port fields.  See header_fields for a complete list
     """
@@ -144,7 +144,7 @@ class Difference(Predicate):
         """
         self.left = left
         self.right = right
-        
+
     def get_physical_predicate(self, port_map):
         l_pred = self.left.get_physical_predicate(port_map)
         r_pred = self.right.get_physical_predicate(port_map)
@@ -206,8 +206,6 @@ class PrimitivePolicy(Policy):
         for act in self.actions:
             p_acts.append(act.get_physical_rep(port_map))
         return PrimitivePolicy(p_pred, p_acts)
-                         
-
 
 class PolicyUnion(Policy):
     """The union of two policies."""
