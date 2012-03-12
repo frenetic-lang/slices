@@ -61,17 +61,16 @@ def policy_is_total(edge_policy, topo):
         True if all the edges in topo have a matching predicate, False
             otherwise.
     """
-    port_set = Set() #should we be checking that there are a certain number of 
-                     #these?
+    port_set = Set()
+
     for (edge_port, predicate) in edge_policy:
         if predicate is None:
             return False #Do we want this?
         port_set.add(edge_port)
-            
-    for port in topo.edges():
-        if not port in port_set:
-            return False
-            
+    for switch in topo.edge_switches():
+        for port in top.edge_ports(switch.sid):
+            if not port in port_set: #check on edge ports, not 'edges'
+                return False
     return True
 
 class Slice:
