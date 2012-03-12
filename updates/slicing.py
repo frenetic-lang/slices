@@ -28,6 +28,9 @@
 # /updates/Slice.py                                                            #
 # Data structure to represent virtual network slices                           #
 ################################################################################
+
+from sets import Set
+
 """Data structure to represent virtual network slices and related tools."""
 
 def is_injective(mapping):
@@ -39,7 +42,12 @@ def is_injective(mapping):
     RETURNS:
         True if mapping is injective, False otherwise
     """
-    pass
+    elem_set = Set()
+    for elem in mapping.keys():
+        if elem in elem_set:
+            return False
+        elem_set.add(elem)
+    return True
 
 def policy_is_total(edge_policy, topo):
     """Determine if an edge policy covers all edge ports.
@@ -53,7 +61,18 @@ def policy_is_total(edge_policy, topo):
         True if all the edges in topo have a matching predicate, False
             otherwise.
     """
-    pass
+    port_set = Set() #should we be checking that there are a certain number of 
+                     #these?
+    for (edge_port, predicate) in edge_policy:
+        if predicate is None:
+            return False #Do we want this?
+        port_set.add(edge_port)
+            
+    for port in topo.edges():
+        if not port in port_set:
+            return False
+            
+    return True
 
 class Slice:
     """Data structure to represent virtual network slices."""
