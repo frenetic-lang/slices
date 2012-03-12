@@ -30,8 +30,6 @@
 ################################################################################
 """Data structure to represent virtual network slices and related tools."""
 
-from sets import Set
-
 def is_injective(mapping):
     """Determine if a mapping is injective.
 
@@ -41,7 +39,7 @@ def is_injective(mapping):
     RETURNS:
         True if mapping is injective, False otherwise
     """
-    elem_set = Set()
+    elem_set = set()
     for elem in mapping.keys():
         if elem in elem_set:
             return False
@@ -60,7 +58,7 @@ def policy_is_total(edge_policy, topo):
         True if all the edges in topo have a matching predicate, False
             otherwise.
     """
-    port_set = Set()
+    port_set = set()
 
     for (edge_port, predicate) in edge_policy:
         if predicate is None:
