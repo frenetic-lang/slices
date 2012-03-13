@@ -25,10 +25,32 @@
 # LICENSE file distributed with this work for specific language governing      #
 # permissions and limitations under the License.                               #
 ################################################################################
-# /updates/Slice.py                                                            #
+# /updates/slicing.py                                                          #
 # Data structure to represent virtual network slices                           #
 ################################################################################
 """Data structure to represent virtual network slices and related tools."""
+
+def get_physical_rules(slices):
+    """Turns a list of virtual slices into a physical topo with netcore 
+       predicates
+
+    ARGS:
+        slices: a list of slices
+
+    RETURNS:
+        The new rules
+    """
+    port_policies = dict()
+    for slic in slices:
+        policy = slic.physical_policies()
+        for (edge_port, predicate) in policy:
+            if edge_port in port_policies:
+                old = port_policies[edge_port]
+                port_policies[edge_port] = old.append(predicate)
+            else:
+                port_policies[edge_port] = [predicate]
+        
+        #TODO combine policies, assign VLANs (probably at an earlier step)    
 
 def is_injective(mapping):
     """Determine if a mapping is injective.
@@ -61,7 +83,7 @@ def policy_is_total(edge_policy, topo):
             return False #Do we want this?
         port_set.add(edge_port)
     for switch in topo.edge_switches():
-        for port in topo.edge_ports(switch): #How do we access the sid?
+        for port in topo.edge_ports(switch):
             if not port in port_set:
                 return False
     return True
@@ -93,6 +115,19 @@ class Slice:
         self.port_map = port_map
         self.edge_policy = edge_policy
         assert self.validate()
+
+    def physical_policies(self):
+        """Convert the slice's virtual policies to physical netcore policies.
+
+        RETURNS:
+        A dictionary mapping physical edge ports to netcore policies
+        """
+        port_map = dict()
+        for (edge_port, predicate) in self.edge_policy:
+            physical_port = port_map[edge_port]
+            netcore_p = None # TODO predicate.to_netcore()
+            port_map[physical_port] = netcore_p
+        return port_map
 
     def validate(self):
         """Check sanity conditions on this slice.
