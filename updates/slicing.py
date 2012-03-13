@@ -28,10 +28,9 @@
 # /updates/Slice.py                                                            #
 # Data structure to represent virtual network slices                           #
 ################################################################################
+"""Data structure to represent virtual network slices and related tools."""
 
 from sets import Set
-
-"""Data structure to represent virtual network slices and related tools."""
 
 def is_injective(mapping):
     """Determine if a mapping is injective.
