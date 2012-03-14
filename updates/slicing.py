@@ -125,8 +125,7 @@ class Slice:
         port_map = dict()
         for (edge_port, predicate) in self.edge_policy:
             physical_port = port_map[edge_port]
-            netcore_p = None # TODO predicate.to_netcore()
-            port_map[physical_port] = netcore_p
+            port_map[physical_port] = predicate
         return port_map
 
     def validate(self):
