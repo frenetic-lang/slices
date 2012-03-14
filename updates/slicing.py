@@ -42,13 +42,18 @@ def get_physical_rules(slices):
     """
     port_policies = dict()
     for slic in slices:
-        policy = slic.physical_policies()
-        for (edge_port, predicate) in policy:
+        for (edge_port, predicate) in slic.physical_policies():
             if edge_port in port_policies:
-                old = port_policies[edge_port]
-                port_policies[edge_port] = old.append(predicate)
+                port_policies[edge_port].append(predicate)
             else:
                 port_policies[edge_port] = [predicate]
+        for(port, predicate) in slic.internal_predicates():
+            if port in port_policies:
+                port_policies[port].append(predicate)
+            else:
+                port_policies[port] = [predicate]
+    return port_policies
+            
         
         #TODO combine policies, assign VLANs (probably at an earlier step)    
 
@@ -126,7 +131,24 @@ class Slice:
         for (edge_port, predicate) in self.edge_policy:
             physical_port = port_map[edge_port]
             port_map[physical_port] = predicate
+
         return port_map
+
+    def internal_predicates(self):
+        """Generate predicates for non-edge ports for use in physical topolpgy
+
+        RETURNS:
+        A dictionary mapping all non-edge virtual ports to a predicate
+        """
+        vlan_pred = None#TODO make an actual value
+        edge_ports = set(self.edge_policy.keys())
+        pred_map = dict()
+        for port in set(self.port_map.keys()):
+            if port not in edge_ports:
+                pred_map[port] = vlan_pred
+        return pred_map
+              
+          
 
     def validate(self):
         """Check sanity conditions on this slice.
