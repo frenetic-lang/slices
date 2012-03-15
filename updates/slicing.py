@@ -38,8 +38,9 @@ def get_physical_rules(slices):
         slices: a list of slices
 
     RETURNS:
-        The new rules
+        A list containing the mappings from physical ports to predicates
     """
+
     port_policies = dict()
     for slic in slices:
         for (edge_port, predicate) in slic.physical_policies():
@@ -47,10 +48,13 @@ def get_physical_rules(slices):
                 port_policies[edge_port].append(predicate)
             else:
                 port_policies[edge_port] = [predicate]
+
+    # TODO combine policies, assign VLANs (probably at an earlier step) 
+    # This may involve adding computations to the loop
+
     return port_policies
             
         
-        #TODO combine policies, assign VLANs (probably at an earlier step)    
 
 def is_injective(mapping):
     """Determine if a mapping is injective.
@@ -123,21 +127,15 @@ class Slice:
         RETURNS:
         A dictionary mapping physical edge ports to netcore policies
         """
-        # Add edge ports
-        port_map = dict()
-        for (edge_port, predicate) in self.edge_policy:
-            physical_port = port_map[edge_port]
-            port_map[physical_port] = predicate
-
-        # Add nonedge ports
         vlan_pred = None #TODO make an actual value
-        for port in set(self.port_map.keys()):
-            if port not in self.edge_policy:
-                physical_port = port_map[port] 
-                # Overwrite previous physical mapping
-                # TODO change if injection removed
-                port_map[physical_port] = vlan_pred
-            
+        port_map = dict() # TODO change if injection removed
+        
+        for (l_port, p_port) in self.port_map:
+            if l_port in self.edge_policy:
+                port_map[p_port] = self.edge_policy[l_port]
+            else:
+                port_map[p_port] = vlan_pred 
+           
         return port_map          
 
     def validate(self):
