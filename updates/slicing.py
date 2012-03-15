@@ -31,7 +31,7 @@
 """Data structure to represent virtual network slices and related tools."""
 
 def get_physical_rules(slices):
-    """Turns a list of virtual slices into a physical topo with netcore 
+    """Turns a list of virtual slices into a physical topo with netcore
        predicates
 
     ARGS:
@@ -49,12 +49,12 @@ def get_physical_rules(slices):
             else:
                 port_policies[port] = [predicate]
 
-    # TODO combine policies, assign VLANs (probably at an earlier step) 
+    # TODO combine policies, assign VLANs (probably at an earlier step)
     # This may involve adding computations to the loop
 
     return port_policies
-            
-        
+
+
 
 def is_injective(mapping):
     """Determine if a mapping is injective.
@@ -70,7 +70,7 @@ def is_injective(mapping):
 
 def policy_is_total(edge_policy, topo):
     """Determine if an edge policy covers all edge ports.
-    
+
     ARGS:
         edge_policy:  collection of (edge_port, predicate) pairs that represents
             a slice's policy for ingress edges
@@ -109,7 +109,7 @@ class Slice:
             edge_policy: set of (edge_port, predicate) pairs, only packets
                 entering the edge port that satisfy the predicate will be allowed to
                 pass
-        
+
         Note that because we need to have the ports in both topologies be
         defined, only finalized NXTopo objects will work for creating a slice.
         """
@@ -121,28 +121,28 @@ class Slice:
         assert self.validate()
 
     def physical_policies(self):
-        """Convert the slice's virtual policies and internal edges 
+        """Convert the slice's virtual policies and internal edges
         to physical netcore policies.
 
         RETURNS:
         A dictionary mapping physical edge ports to netcore policies
         """
         port_map = dict() # change if injection removed
-        
+
         for (l_port, p_port) in self.port_map:
             if l_port in self.edge_policy:
                 port_map[p_port] = self.edge_policy[l_port]
             else:
-                port_map[p_port] = self.get_internal_predicate(l_port) 
-           
-        return port_map          
+                port_map[p_port] = self.get_internal_predicate(l_port)
+
+        return port_map
 
     def get_internal_predicate(self, l_port):
         """Get physical policy for the non-edge port
-       
+
         ARGS:
         l_port: the logical port
-        
+
         RETURNS:
         the physical policy for the given port
 
@@ -155,7 +155,7 @@ class Slice:
             if not port in self.l_topo.edge_ports(l_dest):
                 # add forwarding policy to datastructure using physical ports
                 pass # TODO construct policy
-               
+
     def validate(self):
         """Check sanity conditions on this slice.
 
