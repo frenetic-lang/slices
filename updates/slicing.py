@@ -127,17 +127,35 @@ class Slice:
         RETURNS:
         A dictionary mapping physical edge ports to netcore policies
         """
-        vlan_pred = None #TODO make an actual value
-        port_map = dict() # TODO change if injection removed
+        port_map = dict() # change if injection removed
         
         for (l_port, p_port) in self.port_map:
             if l_port in self.edge_policy:
                 port_map[p_port] = self.edge_policy[l_port]
             else:
-                port_map[p_port] = vlan_pred 
+                port_map[p_port] = self.get_internal_predicate(l_port) 
            
         return port_map          
 
+    def get_internal_predicate(self, l_port):
+        """Get physical policy for the non-edge port
+       
+        ARGS:
+        l_port: the logical port
+        
+        RETURNS:
+        the physical policy for the given port
+
+        """
+
+        # get dest switch
+        l_dest = l_port[1]
+        # get outgoing ports from dest
+        for port in self.l_topo.edges(l_dest):
+            if not port in self.l_topo.edge_ports(l_dest):
+                # add forwarding policy to datastructure using physical ports
+                pass # TODO construct policy
+               
     def validate(self):
         """Check sanity conditions on this slice.
 
