@@ -47,11 +47,6 @@ def get_physical_rules(slices):
                 port_policies[edge_port].append(predicate)
             else:
                 port_policies[edge_port] = [predicate]
-        for(port, predicate) in slic.internal_predicates():
-            if port in port_policies:
-                port_policies[port].append(predicate)
-            else:
-                port_policies[port] = [predicate]
     return port_policies
             
         
@@ -122,33 +117,28 @@ class Slice:
         assert self.validate()
 
     def physical_policies(self):
-        """Convert the slice's virtual policies to physical netcore policies.
+        """Convert the slice's virtual policies and internal edges 
+        to physical netcore policies.
 
         RETURNS:
         A dictionary mapping physical edge ports to netcore policies
         """
+        # Add edge ports
         port_map = dict()
         for (edge_port, predicate) in self.edge_policy:
             physical_port = port_map[edge_port]
             port_map[physical_port] = predicate
 
-        return port_map
-
-    def internal_predicates(self):
-        """Generate predicates for non-edge ports for use in physical topolpgy
-
-        RETURNS:
-        A dictionary mapping all non-edge virtual ports to a predicate
-        """
-        vlan_pred = None#TODO make an actual value
-        edge_ports = set(self.edge_policy.keys())
-        pred_map = dict()
+        # Add nonedge ports
+        vlan_pred = None #TODO make an actual value
         for port in set(self.port_map.keys()):
-            if port not in edge_ports:
-                pred_map[port] = vlan_pred
-        return pred_map
-              
-          
+            if port not in self.edge_policy:
+                physical_port = port_map[port] 
+                # Overwrite previous physical mapping
+                # TODO change if injection removed
+                port_map[physical_port] = vlan_pred
+            
+        return port_map          
 
     def validate(self):
         """Check sanity conditions on this slice.
