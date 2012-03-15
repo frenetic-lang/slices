@@ -43,11 +43,11 @@ def get_physical_rules(slices):
 
     port_policies = dict()
     for slic in slices:
-        for (edge_port, predicate) in slic.physical_policies():
-            if edge_port in port_policies:
-                port_policies[edge_port].append(predicate)
+        for (port, predicate) in slic.physical_policies():
+            if port in port_policies:
+                port_policies[port].append(predicate)
             else:
-                port_policies[edge_port] = [predicate]
+                port_policies[port] = [predicate]
 
     # TODO combine policies, assign VLANs (probably at an earlier step) 
     # This may involve adding computations to the loop
