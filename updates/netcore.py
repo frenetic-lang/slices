@@ -85,8 +85,12 @@ class Header(Predicate):
 
     def get_physical_predicate(self, port_map, switch_map):
         if self.field == 'loc':
-            switch = switch_map[self.pattern[0]]
-            port = port_map[self.pattern[1]]
+            switch = 0
+            if self.pattern[0] != 0:
+                switch = switch_map[self.pattern[0]]
+            port = 0
+            if self.pattern[1] != 0:
+                port = port_map[self.pattern[1]]
             return Header(self.field, (switch, port))
         return Header(self.field, self.pattern)
 
