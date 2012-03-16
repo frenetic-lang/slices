@@ -150,9 +150,3 @@ def external_to_vlan_policy(slic, policy, vlan):
     predicate = nc.nary_union(external_predicates)
     policy_into_vlan = modify_vlan(policy, vlan)
     return nc.PolicyRestriction(policy_into_vlan, predicate)
-=======
-    pass
-
-def strip_vlan(arg):
-    pass
->>>>>>> Stashed changes
