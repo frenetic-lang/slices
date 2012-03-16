@@ -30,22 +30,28 @@
 ################################################################################
 """Netcore grammar objects and related functions."""
 
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 
 class Predicate:
     """Top-level abstract class for predicates."""
     __metaclass__ = ABCMeta
+    
+    @abstractmethod
+    def get_physical_predicate(self, port_map):
+        pass
 
 # Primitive predicates
 
 # Should these just be one class that holds a boolean?
 class Top(Predicate):
     """The always-true predicate."""
-    pass
+    def get_physical_predicate(self, port_map):
+        return Top()
 
 class Bottom(Predicate):
     """The always-false predicate."""
-    pass
+    def get_physical_predicate(self, port_map):
+        return Bottom()
 
 HEADER_FIELDS = set (['loc', # See Header for special note about this value
                       'srcmac',
@@ -77,6 +83,9 @@ class Header(Predicate):
         self.field = field
         self.pattern = pattern
 
+    def get_physical_predicate(self, port_map):
+        return Header(self.field, self.pattern)
+
 def on_port(switch, port):
     """Return a predicate matching packets on switch and port."""
     return Intersection(Header('switch', switch),
@@ -93,6 +102,12 @@ class Union(Predicate):
         """
         self.left = left
         self.right = right
+
+    def get_physical_predicate(self, port_map):
+        l_pred = self.left.get_physical_predicate(port_map)
+        r_pred = self.right.get_physical_predicate(port_map)
+        return Union(l_pred, r_pred)
+
 
 def nary_union(predicates):
     if len(predicates) == 0:
@@ -114,6 +129,11 @@ class Intersection(Predicate):
         self.left = left
         self.right = right
 
+    def get_physical_predicate(self, port_map):
+        l_pred = self.left.get_physical_predicate(port_map)
+        r_pred = self.right.get_physical_predicate(port_map)
+        return Union(l_pred, r_pred)
+
 class Difference(Predicate):
     """A predicate representing the difference of two predicates."""
     def __init__(self, left, right):
@@ -124,6 +144,11 @@ class Difference(Predicate):
         """
         self.left = left
         self.right = right
+        
+    def get_physical_predicate(self, port_map):
+        l_pred = self.left.get_physical_predicate(port_map)
+        r_pred = self.right.get_physical_predicate(port_map)
+        return Union(l_pred, r_pred)
 
 class Action:
     """Description of a forwarding action, with possible modification."""
@@ -152,9 +177,15 @@ class Action:
         # TODO(astory): implement, which requires a fixed packet data structure
         return packet
 
+    def get_physical_rep(self, port_map):
+        return Action(port_map[port], modify)
+
 class Policy:
     """Top-level abstract description of a static network program."""
     __metaclass__ = ABCMeta
+    @abstractmethod
+    def get_physical_rep(self, port_map):
+        pass
 
 class PrimitivePolicy(Policy):
     def __init__(self, predicate, actions):
@@ -167,6 +198,16 @@ class PrimitivePolicy(Policy):
         """
         self.predicate = predicate
         self.actions = actions
+
+    @abstractmethod
+    def get_physical_rep(self, port_map):
+        p_pred = self.predicate.get_physical_predicate(port_map)
+        p_acts = []
+        for act in self.actions:
+            p_acts.append(act.get_physical_rep(port_map))
+        return PrimitivePolicy(p_pred, p_acts)
+                         
+
 
 class PolicyUnion(Policy):
     """The union of two policies."""
