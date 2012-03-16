@@ -177,14 +177,14 @@ class Action:
         # TODO(astory): implement, which requires a fixed packet data structure
         return packet
 
-    def get_physical_rep(self, port_map):
-        return Action(port_map[port], modify)
+    def get_physical_rep(self, port_map, switch_map):
+        return Action(switch_map[self.switch], port_map[self.port], self.modify)
 
 class Policy:
     """Top-level abstract description of a static network program."""
     __metaclass__ = ABCMeta
     @abstractmethod
-    def get_physical_rep(self, port_map):
+    def get_physical_rep(self, port_map, switch_map):
         pass
 
 class PrimitivePolicy(Policy):
@@ -199,8 +199,7 @@ class PrimitivePolicy(Policy):
         self.predicate = predicate
         self.actions = actions
 
-    @abstractmethod
-    def get_physical_rep(self, port_map):
+    def get_physical_rep(self, port_map, switch_map):
         p_pred = self.predicate.get_physical_predicate(port_map)
         p_acts = []
         for act in self.actions:
@@ -220,6 +219,13 @@ class PolicyUnion(Policy):
         self.left = left
         self.right = right
 
+    def get_physical_rep(self, port_map, switch_map):
+        l_pol = self.left.get_physical_rep(port_map, switch_map)
+        r_pol = self.right.get_physical_rep(port_map, switch_map)
+        return PolicyUnion(l_pol, r_pol)
+
+
+
 # Maybe we can provide this with just a function that transforms the policy?
 # -astory
 class PolicyRestriction(Policy):
@@ -232,3 +238,8 @@ class PolicyRestriction(Policy):
         """
         self.policy = policy
         self.predicate = predicate
+
+    def get_physical_rep(self, port_map, switch_map):
+        pol = self.policy.get_physical_rep(port_map, switch_map)
+        pred = self.predicate.get_physical_predicate(port_map)
+        return PolicyRestriction(pol, pred)
