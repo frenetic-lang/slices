@@ -37,7 +37,7 @@ class Predicate:
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def get_physical_predicate(self, port_map):
+    def get_physical_predicate(self, port_map, switch_map):
         pass
 
 # Primitive predicates
@@ -45,12 +45,12 @@ class Predicate:
 # Should these just be one class that holds a boolean?
 class Top(Predicate):
     """The always-true predicate."""
-    def get_physical_predicate(self, port_map):
+    def get_physical_predicate(self, port_map, switch_map):
         return Top()
 
 class Bottom(Predicate):
     """The always-false predicate."""
-    def get_physical_predicate(self, port_map):
+    def get_physical_predicate(self, port_map, switch_map):
         return Bottom()
 
 HEADER_FIELDS = set (['loc', # See Header for special note about this value
@@ -83,7 +83,7 @@ class Header(Predicate):
         self.field = field
         self.pattern = pattern
 
-    def get_physical_predicate(self, port_map):
+    def get_physical_predicate(self, port_map, switch_map):
         return Header(self.field, self.pattern)
 
 def on_port(switch, port):
@@ -103,9 +103,9 @@ class Union(Predicate):
         self.left = left
         self.right = right
 
-    def get_physical_predicate(self, port_map):
-        l_pred = self.left.get_physical_predicate(port_map)
-        r_pred = self.right.get_physical_predicate(port_map)
+    def get_physical_predicate(self, port_map, switch_map):
+        l_pred = self.left.get_physical_predicate(port_map, switch_map)
+        r_pred = self.right.get_physical_predicate(port_map, switch_map)
         return Union(l_pred, r_pred)
 
 
@@ -129,9 +129,9 @@ class Intersection(Predicate):
         self.left = left
         self.right = right
 
-    def get_physical_predicate(self, port_map):
-        l_pred = self.left.get_physical_predicate(port_map)
-        r_pred = self.right.get_physical_predicate(port_map)
+    def get_physical_predicate(self, port_map, switch_map):
+        l_pred = self.left.get_physical_predicate(port_map, switch_map)
+        r_pred = self.right.get_physical_predicate(port_map, switch_map)
         return Union(l_pred, r_pred)
 
 class Difference(Predicate):
@@ -145,9 +145,9 @@ class Difference(Predicate):
         self.left = left
         self.right = right
 
-    def get_physical_predicate(self, port_map):
-        l_pred = self.left.get_physical_predicate(port_map)
-        r_pred = self.right.get_physical_predicate(port_map)
+    def get_physical_predicate(self, port_map, switch_map):
+        l_pred = self.left.get_physical_predicate(port_map, switch_map)
+        r_pred = self.right.get_physical_predicate(port_map, switch_map)
         return Union(l_pred, r_pred)
 
 class Action:
@@ -200,10 +200,10 @@ class PrimitivePolicy(Policy):
         self.actions = actions
 
     def get_physical_rep(self, port_map, switch_map):
-        p_pred = self.predicate.get_physical_predicate(port_map)
+        p_pred = self.predicate.get_physical_predicate(port_map, switch_map)
         p_acts = []
         for act in self.actions:
-            p_acts.append(act.get_physical_rep(port_map))
+            p_acts.append(act.get_physical_rep(port_map, switch_map))
         return PrimitivePolicy(p_pred, p_acts)
 
 class PolicyUnion(Policy):
@@ -239,5 +239,5 @@ class PolicyRestriction(Policy):
 
     def get_physical_rep(self, port_map, switch_map):
         pol = self.policy.get_physical_rep(port_map, switch_map)
-        pred = self.predicate.get_physical_predicate(port_map)
+        pred = self.predicate.get_physical_predicate(port_map, switch_map)
         return PolicyRestriction(pol, pred)
