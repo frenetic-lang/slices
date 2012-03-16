@@ -84,12 +84,15 @@ class Header(Predicate):
         self.pattern = pattern
 
     def get_physical_predicate(self, port_map, switch_map):
+        if self.field == 'loc':
+            switch = switch_map[self.pattern[0]]
+            port = port_map[self.pattern[1]]
+            return Header(self.field, (switch, port))
         return Header(self.field, self.pattern)
 
 def on_port(switch, port):
     """Return a predicate matching packets on switch and port."""
-    return Intersection(Header('switch', switch),
-                        Header('port', port))
+    return Header('loc', (switch, port))
 
 # Compound predicates
 class Union(Predicate):
