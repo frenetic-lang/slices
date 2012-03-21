@@ -229,6 +229,15 @@ class PolicyUnion(Policy):
         r_pol = self.right.get_physical_rep(port_map, switch_map)
         return PolicyUnion(l_pol, r_pol)
 
+def nary_policy_union(policies):
+    if len(policies) == 0:
+        return None
+    else:
+        base = policies[0]
+        for p in policies[1:]:
+            base = PolicyUnion(p, base)
+        return base
+
 
 
 # Maybe we can provide this with just a function that transforms the policy?
