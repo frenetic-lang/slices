@@ -30,32 +30,6 @@
 ################################################################################
 """Data structure to represent virtual network slices and related tools."""
 
-def get_physical_rules(slices):
-    """Turns a list of virtual slices into a physical topo with netcore
-       predicates
-
-    ARGS:
-        slices: a list of slices
-
-    RETURNS:
-        A list containing the mappings from physical ports to predicates
-    """
-
-    port_policies = dict()
-    for slic in slices:
-        for (port, predicate) in slic.physical_policies():
-            if port in port_policies:
-                port_policies[port].append(predicate)
-            else:
-                port_policies[port] = [predicate]
-
-    # TODO combine policies, assign VLANs (probably at an earlier step)
-    # This may involve adding computations to the loop
-
-    return port_policies
-
-
-
 def is_injective(mapping):
     """Determine if a mapping is injective.
 
@@ -119,42 +93,6 @@ class Slice:
         self.port_map = port_map
         self.edge_policy = edge_policy
         assert self.validate()
-
-    def physical_policies(self):
-        """Convert the slice's virtual policies and internal edges
-        to physical netcore policies.
-
-        RETURNS:
-        A dictionary mapping physical edge ports to netcore policies
-        """
-        port_map = dict() # change if injection removed
-
-        for (l_port, p_port) in self.port_map:
-            if l_port in self.edge_policy:
-                port_map[p_port] = self.edge_policy[l_port]
-            else:
-                port_map[p_port] = self.get_internal_predicate(l_port)
-
-        return port_map
-
-    def get_internal_predicate(self, l_port):
-        """Get physical policy for the non-edge port
-
-        ARGS:
-        l_port: the logical port
-
-        RETURNS:
-        the physical policy for the given port
-
-        """
-
-        # get dest switch
-        l_dest = l_port[1]
-        # get outgoing ports from dest
-        for port in self.l_topo.edges(l_dest):
-            if not port in self.l_topo.edge_ports(l_dest):
-                # add forwarding policy to datastructure using physical ports
-                pass # TODO construct policy
 
     def validate(self):
         """Check sanity conditions on this slice.
