@@ -1,6 +1,6 @@
 import nxtopo
 import slicing
-import netcore
+import netcore as nc
 
 def get_slices():
     p_topo = nxtopo.NXTopo()
@@ -12,24 +12,36 @@ def get_slices():
     p_topo.add_host(7)
     p_topo.add_host(8)
     p_topo.add_host(9)
-    p_topo.add_link(1,3)
-    p_topo.add_link(1,4)
-    p_topo.add_link(1,5)
-    p_topo.add_link(2,3)
-    p_topo.add_link(2,4)
-    p_topo.add_link(2,5)
-    p_topo.add_link(3,7)
-    p_topo.add_link(4,8)
-    p_topo.add_link(5,9)
+    p_topo.add_link(1, 3)
+    p_topo.add_link(1, 4)
+    p_topo.add_link(1, 5)
+    p_topo.add_link(2, 3)
+    p_topo.add_link(2, 4)
+    p_topo.add_link(2, 5)
+    p_topo.add_link(3, 7)
+    p_topo.add_link(4, 8)
+    p_topo.add_link(5, 9)
     p_topo.finalize()
 
-    slic_list = [getSlice(13, 11, 14, 17, 18, -10, p_topo)]
-    slic_list.append(getSlice(13, 11, 15, 17, 19, -10, p_topo))
-    slic_list.append(getSlice(14, 12, 15, 18, 19, -10, p_topo))
+    slic_list = [# All traffic to one port
+                 getSlice(13, 11, 14, 17, 18, -10,
+                    nc.Header('dstport', 25565), p_topo),
+                 # All IPv6 traffic
+                 getSlice(13, 11, 15, 17, 19, -10,
+                    nc.Header('ethtype', 0x86DD), p_topo),
+                 # IPv4 web traffic, tightly specified
+                 getSlice(14, 12, 15, 18, 19, -10,
+                          # IPv4
+                          nc.nary_intersection[nc.Header('ethtype', 0x0800),
+                                               # TCP
+                                               nc.Header('protocol', 0x06),
+                                               # Port 80
+                                               nc.Header('dstport', 80)],
+                          p_topo)]
 
     return slic_list
 
-def getSlice(l_sLeft, l_sMid, l_sRight, l_hLeft, l_hRight, adj,  p_topo):
+def getSlice(l_sLeft, l_sMid, l_sRight, l_hLeft, l_hRight, adj, policy, p_topo):
     # Slice of form
     #         mid
     #        /   \
@@ -69,16 +81,11 @@ def getSlice(l_sLeft, l_sMid, l_sRight, l_hLeft, l_hRight, adj,  p_topo):
 
     ep1 = (l_sLeft, l_topo.edge_ports(l_sLeft)[0])
     ep2 = (l_sRight, l_topo.edge_ports(l_sRight)[0])
-    policy = netcore.PrimitivePolicy(netcore.Top(),[]) #TODO make real
 
     slic = slicing.Slice(l_topo, p_topo, s_map, p_map,
                          {ep1 : policy, ep2 : policy})
 
     return slic
-
-
-
-
 
 def addToPortMap(s1, s2, p_map, s_map, l_topo, p_topo):
     s1p = s_map[s1]
@@ -98,6 +105,3 @@ def addHostPortToMap(s, h_l, h_p, p_map, s_map, l_topo, p_topo):
     p_map[key] = val
 
 get_slices()
-
-
-
