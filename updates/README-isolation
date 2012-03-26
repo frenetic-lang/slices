@@ -1,0 +1,38 @@
+Files
+--------
+
+--compile.py: Contains mostly static methods to assist in the compilation 
+process.  The most important method here is transform(), which will perform the 
+actual compilation process given a list of slices. The helper methods are
+descriptively named and generally do not do much of the work outside of 
+a recursive descent and modification of the policy tree (much of the work in 
+compilation is of this style).
+
+--netcore.py: This module is used to represent the various constructs in 
+Netcore. Once again, it's function is fairly straight-forward and the modules
+are mostly fairly simple. The most interesting methods are 
+get_physical_predicate() in the Predicate module and get_physical_rep() in the
+Policy and Action modules.  These use the supplied maps to return a copy of the
+data structure in which each port/switch is replaced by what it maps to in the
+supplied map.
+
+--README-isolation: an incoherent overview of files in the isolation project
+
+--slicing.py: This is used to represent a slice, which contains logical and 
+physical topos and the mappings of switches and ports between them. It is
+really a simple module that wraps these data-structures and provides verification
+upon construction
+
+Building Examples
+-------------------
+A rough (and perhaps incorrect guide)
+
+1. Design and build a physical topology (using nxtop.NXTopo)
+2. Design a logical topology and create a mapping from its ports and switches
+   to the ports and switches of the physical topo
+3. Create edge policies for all edges in the logical topo that leave the 
+   network. (These should be netcore policies)
+4. Create a slice using these data structures
+5. Repeat 1-5 up to 255 times
+6. Put all the slices you have into a list, and hand them to compile.transform.
+7. Check your results

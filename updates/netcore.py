@@ -37,7 +37,21 @@ class Predicate:
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def get_physical_predicate(self, port_map):
+    def get_physical_predicate(self, port_map, switch_map):
+        """ Creates a copy of this Predicate in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        
+        ARGS:
+        port_map: map from logical to physical ports
+        switch_map: map from logical to physical switches
+
+
+        RETURNS:
+        a copy of this Predicate in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        """
         pass
 
 # Primitive predicates
@@ -45,12 +59,12 @@ class Predicate:
 # Should these just be one class that holds a boolean?
 class Top(Predicate):
     """The always-true predicate."""
-    def get_physical_predicate(self, port_map):
+    def get_physical_predicate(self, port_map, switch_map):
         return Top()
 
 class Bottom(Predicate):
     """The always-false predicate."""
-    def get_physical_predicate(self, port_map):
+    def get_physical_predicate(self, port_map, switch_map):
         return Bottom()
 
 HEADER_FIELDS = set (['loc', # See Header for special note about this value
@@ -83,13 +97,34 @@ class Header(Predicate):
         self.field = field
         self.pattern = pattern
 
-    def get_physical_predicate(self, port_map):
+    def get_physical_predicate(self, port_map, switch_map):
+        """ Creates a copy of this Predicate in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        
+        ARGS:
+        port_map: map from logical to physical ports
+        switch_map: map from logical to physical switches
+
+
+        RETURNS:
+        a copy of this Predicate in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        """
+        if self.field == 'loc':
+            switch = 0
+            if self.pattern[0] != 0:
+                switch = switch_map[self.pattern[0]]
+            port = 0
+            if self.pattern[1] != 0:
+                port = port_map[self.pattern[1]]
+            return Header(self.field, (switch, port))
         return Header(self.field, self.pattern)
 
 def on_port(switch, port):
     """Return a predicate matching packets on switch and port."""
-    return Intersection(Header('switch', switch),
-                        Header('port', port))
+    return Header('loc', (switch, port))
 
 # Compound predicates
 class Union(Predicate):
@@ -103,9 +138,23 @@ class Union(Predicate):
         self.left = left
         self.right = right
 
-    def get_physical_predicate(self, port_map):
-        l_pred = self.left.get_physical_predicate(port_map)
-        r_pred = self.right.get_physical_predicate(port_map)
+    def get_physical_predicate(self, port_map, switch_map):
+        """ Creates a copy of this Predicate in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        
+        ARGS:
+        port_map: map from logical to physical ports
+        switch_map: map from logical to physical switches
+
+
+        RETURNS:
+        a copy of this Predicate in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        """
+        l_pred = self.left.get_physical_predicate(port_map, switch_map)
+        r_pred = self.right.get_physical_predicate(port_map, switch_map)
         return Union(l_pred, r_pred)
 
 
@@ -129,9 +178,23 @@ class Intersection(Predicate):
         self.left = left
         self.right = right
 
-    def get_physical_predicate(self, port_map):
-        l_pred = self.left.get_physical_predicate(port_map)
-        r_pred = self.right.get_physical_predicate(port_map)
+    def get_physical_predicate(self, port_map, switch_map):
+        """ Creates a copy of this Predicate in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        
+        ARGS:
+        port_map: map from logical to physical ports
+        switch_map: map from logical to physical switches
+
+
+        RETURNS:
+        a copy of this Predicate in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        """
+        l_pred = self.left.get_physical_predicate(port_map, switch_map)
+        r_pred = self.right.get_physical_predicate(port_map, switch_map)
         return Union(l_pred, r_pred)
 
 class Difference(Predicate):
@@ -145,9 +208,23 @@ class Difference(Predicate):
         self.left = left
         self.right = right
 
-    def get_physical_predicate(self, port_map):
-        l_pred = self.left.get_physical_predicate(port_map)
-        r_pred = self.right.get_physical_predicate(port_map)
+    def get_physical_predicate(self, port_map, switch_map):
+        """ Creates a copy of this Predicate in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        
+        ARGS:
+        port_map: map from logical to physical ports
+        switch_map: map from logical to physical switches
+
+
+        RETURNS:
+        a copy of this Predicate in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        """
+        l_pred = self.left.get_physical_predicate(port_map, switch_map)
+        r_pred = self.right.get_physical_predicate(port_map, switch_map)
         return Union(l_pred, r_pred)
 
 class Action:
@@ -177,14 +254,29 @@ class Action:
         # TODO(astory): implement, which requires a fixed packet data structure
         return packet
 
-    def get_physical_rep(self, port_map):
-        return Action(port_map[port], modify)
+    def get_physical_rep(self, port_map, switch_map):
+        return Action(switch_map[self.switch], port_map[self.port], self.modify)
 
 class Policy:
     """Top-level abstract description of a static network program."""
     __metaclass__ = ABCMeta
+    
     @abstractmethod
-    def get_physical_rep(self, port_map):
+    def get_physical_rep(self, port_map, switch_map):
+        """ Creates a copy of this object in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        
+        ARGS:
+        port_map: map from logical to physical ports
+        switch_map: map from logical to physical switches
+
+
+        RETURNS:
+        a copy of this object in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        """
         pass
 
 class PrimitivePolicy(Policy):
@@ -199,12 +291,25 @@ class PrimitivePolicy(Policy):
         self.predicate = predicate
         self.actions = actions
 
-    @abstractmethod
-    def get_physical_rep(self, port_map):
-        p_pred = self.predicate.get_physical_predicate(port_map)
+    def get_physical_rep(self, port_map, switch_map):
+        """ Creates a copy of this object in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        
+        ARGS:
+        port_map: map from logical to physical ports
+        switch_map: map from logical to physical switches
+
+
+        RETURNS:
+        a copy of this object in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        """
+        p_pred = self.predicate.get_physical_predicate(port_map, switch_map)
         p_acts = []
         for act in self.actions:
-            p_acts.append(act.get_physical_rep(port_map))
+            p_acts.append(act.get_physical_rep(port_map, switch_map))
         return PrimitivePolicy(p_pred, p_acts)
 
 class PolicyUnion(Policy):
@@ -218,6 +323,36 @@ class PolicyUnion(Policy):
         self.left = left
         self.right = right
 
+    def get_physical_rep(self, port_map, switch_map):
+        """ Creates a copy of this object in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        
+        ARGS:
+        port_map: map from logical to physical ports
+        switch_map: map from logical to physical switches
+
+
+        RETURNS:
+        a copy of this object in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        """
+        l_pol = self.left.get_physical_rep(port_map, switch_map)
+        r_pol = self.right.get_physical_rep(port_map, switch_map)
+        return PolicyUnion(l_pol, r_pol)
+
+def nary_policy_union(policies):
+    if len(policies) == 0:
+        return None
+    else:
+        base = policies[0]
+        for p in policies[1:]:
+            base = PolicyUnion(p, base)
+        return base
+
+
+
 # Maybe we can provide this with just a function that transforms the policy?
 # -astory
 class PolicyRestriction(Policy):
@@ -230,3 +365,22 @@ class PolicyRestriction(Policy):
         """
         self.policy = policy
         self.predicate = predicate
+
+    def get_physical_rep(self, port_map, switch_map):
+        """ Creates a copy of this object in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        
+        ARGS:
+        port_map: map from logical to physical ports
+        switch_map: map from logical to physical switches
+
+
+        RETURNS:
+        a copy of this object in which all logical
+        ports and switches have been mapped to their physical 
+        counterparts
+        """
+        pol = self.policy.get_physical_rep(port_map, switch_map)
+        pred = self.predicate.get_physical_predicate(port_map, switch_map)
+        return PolicyRestriction(pol, pred)
