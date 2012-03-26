@@ -56,13 +56,14 @@ def policy_is_total(edge_policy, topo):
     """
     port_set = set()
 
-    for (edge_port, predicate) in edge_policy:
+    for edge_port in edge_policy.keys():
+        predicate = edge_policy[edge_port]
         if predicate is None:
             return False #Do we want this?
         port_set.add(edge_port)
     for switch in topo.edge_switches():
         for port in topo.edge_ports(switch):
-            if not port in port_set:
+            if not (switch, port) in port_set:
                 return False
     return True
 
@@ -104,8 +105,20 @@ class Slice:
         * port_map is injective
         * every edge port in the logical topology is associated with a predicate
         """
-        return (self.l_topo.nodes == self.node_map.keys() and
-                self.l_topo.edges == self.port_map.keys() and
+
+        ports = set()
+        for s in self.l_topo.switches():
+            for p in self.l_topo.node[s]['ports'].values():
+                ports.add((s,p))
+                
+        #    print self.l_topo.switches() == self.node_map.keys()
+        #    print ports == set(self.port_map.keys())
+        #    print is_injective(self.node_map)
+        #    print is_injective(self.port_map)
+        #    print policy_is_total(self.edge_policy, self.l_topo)
+        
+        return (self.l_topo.switches() == self.node_map.keys() and
+                ports == set(self.port_map.keys()) and
                 is_injective(self.node_map) and
                 is_injective(self.port_map) and
                 policy_is_total(self.edge_policy, self.l_topo))
