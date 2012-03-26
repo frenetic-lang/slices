@@ -83,24 +83,21 @@ def transform(slices):
     policy_list = []
     vlan = 1
     for (slic, policy) in slices:
-
         # Produce a policy that only accepts packets within our vlan
         safe_policy = isolated_policy(policy, vlan)
-        # Modify it to strio the vlan tag from outbound ports
-        safe_outport_policy = internal_strip_vlan_policy(slic, safe_policy)
-
         # Produce a separate policy that adds vlan tags to safe incoming packets
         inport_policy = external_to_vlan_policy(slic, policy, vlan)
+        # Take their union
+        safe_inport_policy = nc.PolicyUnion(safe_outport_policy, inport_policy)
 
-        # Take the union of the safe internal policy that also strips vlans with
-        # the policy that adds vlan tags to safe packets
-        virtual_policy = nc.PolicyUnion(safe_outport_policy, inport_policy)
+        # Modify the result to strip the vlan tag from outbound ports
+        # Note that this should be the last step.  If our policy takes an
+        # incoming packet and forwards it directly out, we should still remove
+        # its vlan tag.
+        full_policy = internal_strip_vlan_policy(slic, safe_policy)
 
-#       outport_policy =  strip_outgoing_vlan(slic, policy)
-#       slice_policy = nc.nary_policy_union(
-#           [safe_policy, inport_policy, outport_policy])
         policy_list.append(
-            virtual_policy.get_physical_rep(slic.port_map, slic.switch_map))
+            full_policy.get_physical_rep(slic.port_map, slic.switch_map))
         vlan += 1
     return nc.nary_policy_union(policy_list)
 
