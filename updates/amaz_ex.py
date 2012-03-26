@@ -22,7 +22,7 @@ def get_slices():
     p_topo.add_link(4,8)
     p_topo.add_link(5,9)
     p_topo.finalize()
-    
+
     slic_list = [getSlice(13, 11, 14, 17, 18, -10, p_topo)]
     slic_list.append(getSlice(13, 11, 15, 17, 19, -10, p_topo))
     slic_list.append(getSlice(14, 12, 15, 18, 19, -10, p_topo))
@@ -33,7 +33,7 @@ def getSlice(l_sLeft, l_sMid, l_sRight, l_hLeft, l_hRight, adj,  p_topo):
     # Slice of form
     #         mid
     #        /   \
-    #     left   right 
+    #     left   right
     #      |       |
     #    hLeft   hRight
     #
@@ -42,13 +42,13 @@ def getSlice(l_sLeft, l_sMid, l_sRight, l_hLeft, l_hRight, adj,  p_topo):
     l_topo = nxtopo.NXTopo()
     s_map = dict()
     p_map = dict()
-    
+
     l_topo.add_switch(l_sMid)
     s_map[l_sMid] = l_sMid + adj
     l_topo.add_switch(l_sLeft)
     s_map[l_sLeft] = l_sLeft + adj
     l_topo.add_switch(l_sRight)
-    s_map[l_sRight] = l_sRight + adj 
+    s_map[l_sRight] = l_sRight + adj
     l_topo.add_host(l_hLeft)
     l_topo.add_host(l_hRight)
 
@@ -62,18 +62,18 @@ def getSlice(l_sLeft, l_sMid, l_sRight, l_hLeft, l_hRight, adj,  p_topo):
     addToPortMap(l_sMid, l_sLeft, p_map, s_map, l_topo, p_topo)
     addToPortMap(l_sMid, l_sRight, p_map, s_map, l_topo, p_topo)
 
-    addHostPortToMap(l_sLeft, l_hLeft, l_hLeft + adj, p_map, s_map, 
+    addHostPortToMap(l_sLeft, l_hLeft, l_hLeft + adj, p_map, s_map,
                      l_topo, p_topo)
-    addHostPortToMap(l_sRight, l_hRight, l_hRight + adj, p_map, s_map, 
+    addHostPortToMap(l_sRight, l_hRight, l_hRight + adj, p_map, s_map,
                      l_topo, p_topo)
-    
+
     ep1 = (l_sLeft, l_topo.edge_ports(l_sLeft)[0])
     ep2 = (l_sRight, l_topo.edge_ports(l_sRight)[0])
     policy = netcore.PrimitivePolicy(netcore.Top(),[]) #TODO make real
 
-    slic = slicing.Slice(l_topo, p_topo, s_map, p_map, 
+    slic = slicing.Slice(l_topo, p_topo, s_map, p_map,
                          {ep1 : policy, ep2 : policy})
-    
+
     return slic
 
 
@@ -97,7 +97,7 @@ def addHostPortToMap(s, h_l, h_p, p_map, s_map, l_topo, p_topo):
     val = (sp, p_topo.node[sp]['ports'][h_p])
     p_map[key] = val
 
-get_slices()    
+get_slices()
 
 
 
