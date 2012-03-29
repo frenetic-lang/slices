@@ -2,23 +2,6 @@ import nxtopo
 import slicing
 import netcore
 
-def figurin():
-    p_topo = nxtopo.NXTopo()
-    p_topo.add_switch(1)
-    p_topo.add_switch(2)
-    p_topo.add_switch(3)
-    p_topo.add_link(1,2)
-    p_topo.add_link(2,1)
-    p_topo.add_link(1,3)
-    p_topo.add_link(3,1)
-    p_topo.add_link(3,2)
-    p_topo.add_link(2,3)
-    p_topo.add_host(4)
-    p_topo.add_link(1,4)
-    p_topo.finalize()
-    return p_topo
-
-
 def get_slices():
     p_topo = nxtopo.NXTopo()
     p_topo.add_switch(1)
