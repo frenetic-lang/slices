@@ -39,34 +39,12 @@ def get_slices():
     p_topo.add_link(4,8)
     p_topo.add_link(5,9)
     p_topo.finalize()
-
-    l_topo1 = nxtopo.NXTopo()
-    s_map1 = dict()
-    p_map1 = dict()
-
-    l_topo1.add_switch(11)
-    s_map1[11] = 1
-    l_topo1.add_switch(13)
-    s_map1[13] = 3
-    l_topo1.add_switch(14)
-    s_map1[14] = 4
-    l_topo1.add_host(17)
-    l_topo1.add_host(18)
     
-    l_topo1.add_link(11,13)
-    l_topo1.add_link(11,14)
-    l_topo1.add_link(13,17)
-    l_topo1.add_link(14,18)
+    slic_list = [getSlice(13, 11, 14, 17, 18, -10, p_topo)]
+    slic_list.append(getSlice(13, 11, 15, 17, 19, -10, p_topo))
+    slic_list.append(getSlice(14, 12, 15, 18, 19, -10, p_topo))
 
-    l_topo1.finalize()
-    
-    addToPortMap(11, 13, p_map1, s_map1, l_topo1, p_topo)
-    addToPortMap(11, 14, p_map1, s_map1, l_topo1, p_topo)
-    
-    addHostPortToMap(13, 17, 7, p_map1, s_map1, l_topo1, p_topo)
-    addHostPortToMap(14, 18, 8, p_map1, s_map1, l_topo1, p_topo)
-
-    return [getSlice(13, 11, 14, 17, 18, -10, p_topo)]
+    return slic_list
 
 def getSlice(l_sLeft, l_sMid, l_sRight, l_hLeft, l_hRight, adj,  p_topo):
     # Slice of form
@@ -83,7 +61,7 @@ def getSlice(l_sLeft, l_sMid, l_sRight, l_hLeft, l_hRight, adj,  p_topo):
     p_map = dict()
     
     l_topo.add_switch(l_sMid)
-    s_map[11] = l_sMid + adj
+    s_map[l_sMid] = l_sMid + adj
     l_topo.add_switch(l_sLeft)
     s_map[l_sLeft] = l_sLeft + adj
     l_topo.add_switch(l_sRight)
