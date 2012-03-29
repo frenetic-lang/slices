@@ -1,5 +1,6 @@
 import nxtopo
 import slicing
+import netcore
 
 def figurin():
     p_topo = nxtopo.NXTopo()
@@ -65,9 +66,18 @@ def get_slices():
     addHostPortToMap(13, 17, 7, p_map1, s_map1, l_topo1, p_topo)
     addHostPortToMap(14, 18, 8, p_map1, s_map1, l_topo1, p_topo)
 
-    print p_map1 == getSlice(13,11,14,17,18,-10,p_topo)
+    return [getSlice(13, 11, 14, 17, 18, -10, p_topo)]
 
 def getSlice(l_sLeft, l_sMid, l_sRight, l_hLeft, l_hRight, adj,  p_topo):
+    # Slice of form
+    #         mid
+    #        /   \
+    #     left   right 
+    #      |       |
+    #    hLeft   hRight
+    #
+    # Where adj converts it back to a physical number
+
     l_topo = nxtopo.NXTopo()
     s_map = dict()
     p_map = dict()
@@ -96,7 +106,14 @@ def getSlice(l_sLeft, l_sMid, l_sRight, l_hLeft, l_hRight, adj,  p_topo):
     addHostPortToMap(l_sRight, l_hRight, l_hRight + adj, p_map, s_map, 
                      l_topo, p_topo)
     
-    return p_map
+    ep1 = (l_sLeft, l_topo.edge_ports(l_sLeft)[0])
+    ep2 = (l_sRight, l_topo.edge_ports(l_sRight)[0])
+    policy = netcore.PrimitivePolicy(netcore.Top(),[]) #TODO make real
+
+    slic = slicing.Slice(l_topo, p_topo, s_map, p_map, 
+                         {ep1 : policy, ep2 : policy})
+    
+    return slic
 
 
 
