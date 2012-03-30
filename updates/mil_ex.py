@@ -16,25 +16,26 @@ def get_slices():
     p_topo.finalize()
 
     slices = []
-    for s1p in range(1,3):
+    for i in range(1,3):
         l_topo = nxtopo.NXTopo()
         s_map = dict()
+        s1p = i
         s2p = s1p + 2
         
-        s1l = s1p + 10
+        s1l = s1p + (i * 10) 
         l_topo.add_switch(s1l)
         s_map[s1l] = s1p
         
-        s2l = s2p + 10
+        s2l = s2p + (i * 10)
         l_topo.add_switch(s2l)
         s_map[s2l] = s2p
         
         h1p = s1p + 5
         h2p = s2p + 5
         
-        h1l = h1p + 10
+        h1l = h1p + (i* 10)
         l_topo.add_host(h1l)
-        h2l = h2p + 10
+        h2l = h2p + (i * 10)
         l_topo.add_host(h2l)
 
         l_topo.add_link(s1l, s2l)
