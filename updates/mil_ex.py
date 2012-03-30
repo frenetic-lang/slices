@@ -54,9 +54,9 @@ def get_slices():
         ep2 = (s2l, l_topo.edge_ports(s2l)[0])
         
         if s1p == 1:
-            policy = "1" #TODO make real
+            policy = netcore.Header('dstport', 25565)
         else:
-            policy = "2"
+            policy = netcore.Header('ethtype', 0x86DD)
 
         slic = slicing.Slice(l_topo, p_topo, s_map, p_map,
                              {ep1 : policy, ep2 : policy})
