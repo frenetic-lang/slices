@@ -189,7 +189,7 @@ def nary_union(predicates):
         return base
 
 def nary_intersection(predicates):
-    """Return a union of all predicates in predicates."""
+    """Return a intersection of all predicates in predicates."""
     if len(predicates) == 0:
         return None
     else:
