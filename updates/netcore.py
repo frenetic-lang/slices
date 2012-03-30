@@ -188,6 +188,16 @@ def nary_union(predicates):
             base = Union(predicate, base)
         return base
 
+def nary_intersection(predicates):
+    """Return a union of all predicates in predicates."""
+    if len(predicates) == 0:
+        return None
+    else:
+        base = predicates[0]
+        for predicate in predicates[1:]:
+            base = Intersection(predicate, base)
+        return base
+
 class Intersection(Predicate):
     """A predicate representing the intersection of two predicates."""
     def __init__(self, left, right):

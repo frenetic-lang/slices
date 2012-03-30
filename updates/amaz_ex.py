@@ -27,16 +27,16 @@ def get_slices():
                  getSlice(13, 11, 14, 17, 18, -10,
                     nc.Header('dstport', 25565), p_topo),
                  # All IPv6 traffic
-                 getSlice(13, 11, 15, 17, 19, -10,
+                 getSlice(23, 21, 25, 27, 29, -20,
                     nc.Header('ethtype', 0x86DD), p_topo),
                  # IPv4 web traffic, tightly specified
-                 getSlice(14, 12, 15, 18, 19, -10,
+                 getSlice(34, 32, 35, 38, 39, -30,
                           # IPv4
-                          nc.nary_intersection[nc.Header('ethtype', 0x0800),
+                          nc.nary_intersection([nc.Header('ethtype', 0x0800),
                                                # TCP
                                                nc.Header('protocol', 0x06),
                                                # Port 80
-                                               nc.Header('dstport', 80)],
+                                               nc.Header('dstport', 80)]),
                           p_topo)]
 
     return slic_list
