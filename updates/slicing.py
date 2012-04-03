@@ -111,11 +111,11 @@ class Slice:
             for p in self.l_topo.node[s]['ports'].values():
                 ports.add((s,p))
                 
-        #    print self.l_topo.switches() == self.node_map.keys()
-        #    print ports == set(self.port_map.keys())
-        #    print is_injective(self.node_map)
-        #    print is_injective(self.port_map)
-        #    print policy_is_total(self.edge_policy, self.l_topo)
+      #  print self.l_topo.switches() == self.node_map.keys()
+      #  print ports == set(self.port_map.keys())
+      #  print is_injective(self.node_map)
+      #  print is_injective(self.port_map)
+      #  print policy_is_total(self.edge_policy, self.l_topo)
         
         return (self.l_topo.switches() == self.node_map.keys() and
                 ports == set(self.port_map.keys()) and
