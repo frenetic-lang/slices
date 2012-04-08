@@ -97,7 +97,7 @@ class Header(Predicate):
     """
     def __init__(self, field, pattern):
         """
-        ARGS:
+       ARGS:
             field: header field to match pattern against
             pattern: (possibly) wildcarded bitstring, except in the case of loc,
                 where it's (switch, port), where both are ints, with 0
@@ -267,17 +267,19 @@ class Difference(Predicate):
 
 class Action:
     """Description of a forwarding action, with possible modification."""
-    def __init__(self, switch, port, modify=dict()):
+    def __init__(self, switch, ports=[], modify=dict()):
         """
         ARGS:
-            switch: switch on which the port lives
-            port: port to which to forward packet
+            switch: switch on which the ports live
+            ports: ports to which to forward packet
             modify: dictionary of header fields to wildcarded strings, those
                 fields in the packet will be overwritten by non-wildcard bits in
                 the corresponding string.
         """
+        assert(isinstance(ports, type([])))
+        assert(isinstance(modify, type({})))
         self.switch = switch
-        self.port = port
+        self.ports = ports
         self.modify = modify
 
     def modify_packet(self, packet):
@@ -293,11 +295,12 @@ class Action:
         # TODO(astory): update wildcards correctly that are smaller than whole
         # fields
         new.fields.update(self.modify)
-        return (new, (self.switch, (self.switch, self.port)))
+        return (new, (self.switch, (self.switch, self.ports)))
 
     def get_physical_rep(self, port_map, switch_map):
         """Return this action mapped to a physical network."""
-        return Action(switch_map[self.switch], port_map[self.port], self.modify)
+        p_ports = [port_map[p] for p in self.ports]
+        return Action(switch_map[self.switch], p_ports, self.modify)
 
 class Policy:
     """Top-level abstract description of a static network program."""
@@ -327,17 +330,18 @@ class Policy:
         pass
 
 class PrimitivePolicy(Policy):
-    """Policy for mapping a single predicate to actions."""
-    def __init__(self, predicate, actions):
+    """Policy for mapping a single predicate to an action."""
+    def __init__(self, predicate, action):
         """
         ARGS:
-            predicate: predicate under which to apply actions
-            actions: list of actions to apply to packets which match predicate,
-                all actions are applied, resulting in potentially multiple
-                packets.  Note that this may be the empty list.
+            predicate: predicate under which to apply action
+            action: an Action to apply to packets which match predicate,
+                all modifications and forwads are applied, resulting in 
+                potentially multiple packets.  Note that Action.ports may 
+                be the empty list.
         """
         self.predicate = predicate
-        self.actions = actions
+        self.action = action
 
     def get_physical_rep(self, port_map, switch_map):
         """ Creates a copy of this object in which all logical
@@ -355,14 +359,12 @@ class PrimitivePolicy(Policy):
         counterparts
         """
         p_pred = self.predicate.get_physical_predicate(port_map, switch_map)
-        p_acts = []
-        for act in self.actions:
-            p_acts.append(act.get_physical_rep(port_map, switch_map))
-        return PrimitivePolicy(p_pred, p_acts)
+        p_act = self.action.get_physical_rep(port_map, switch_map)
+        return PrimitivePolicy(p_pred, p_act)
 
     def get_actions(self, packet, loc):
         if self.predicate.matches(packet, loc):
-            return [a.modify(packet) for a in self.actions]
+            return [self.action.modify(packet) for p in self.action.ports]
 
 class PolicyUnion(Policy):
     """The union of two policies."""
