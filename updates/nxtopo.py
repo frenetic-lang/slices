@@ -72,6 +72,50 @@ class NXTopo(nx.Graph):
                 result.add(self.node[sid]['ports'][x])
         return list(result)
 
+    # This differs from the normal NX.Graph subgraph() in that we need
+    # to be very careful in what node attributes we propagate
+    # over. For the moment, I propagate all of them. 
+    def subgraph(self, nbunch):
+        """Return the subgraph induced on switches in nbunch.
+
+        The induced subgraph of the graph contains the nodes in nbunch
+        and the edges between those nodes.
+
+        Parameters
+        ----------
+        nbunch : list, iterable
+            A container of nodes which will be iterated through once.
+
+        Returns
+        -------
+        G : NXTopo
+            A subgraph of the graph with the same edge attributes.
+        """
+        nbunch = list(nbunch) + self.hosts()        
+        bunch =self.nbunch_iter(nbunch)
+        # create new graph and copy subgraph into it
+        H = NXTopo()
+        # copy node and attribute dictionaries
+        for n in bunch:
+            H.node[n]=self.node[n]
+        # namespace shortcuts for speed
+        H_adj=H.adj
+        self_adj=self.adj
+        # add nodes and edges (undirected method)
+        for n in H.node:
+            Hnbrs={}
+            H_adj[n]=Hnbrs
+            for nbr,d in self_adj[n].items():
+                if nbr in H_adj:
+                    # add both representations of edge: n-nbr and nbr-n
+                    Hnbrs[nbr]=d
+                    H_adj[nbr][n]=d
+        H.graph=self.graph
+        # Can't call finalize() here because the node attributes are
+        # shared w/ the parent graph.
+        H.finalized = True
+        return H
+
     def finalize(self):
         # make mininet topo
         topo = Topo()
@@ -87,9 +131,14 @@ class NXTopo(nx.Graph):
         # backpatch ports into original graph
         for x in self.nodes():
             self.node[x]['ports'] = {}
-            for y in self.neighbors(x):               
-                self.node[x]['ports'][y] = topo.port(x,y)[0]
+            self.node[x]['port'] = {}            
+            for y in self.neighbors(x):
+                x_port, y_port = topo.port(x,y)
+                self.node[x]['ports'][y] = x_port
+                # Support indexing in by port to get neighbor switch/port                
+                self.node[x]['port'][x_port] = (y, y_port)
 
+        
         topo.enable_all()
         self.topo = topo        
         self.finalized = True
@@ -97,6 +146,7 @@ class NXTopo(nx.Graph):
     def nx_graph(self):
         assert self.finalized
         return self.copy()
+
 
     def mininet_topo(self):
         assert self.finalized
