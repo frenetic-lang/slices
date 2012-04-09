@@ -42,6 +42,9 @@ The following restrictions on NetCore are currently in place:
 
 """
 
+# TODO: remove
+global log
+
 ##
 # NetCore (Python) predicate and policy language, as defined in netcore.py.
 #
@@ -87,29 +90,87 @@ class Bone:
         self.pattern = pattern
         self.action = action
 
+    def __str__(self):
+        return "%s :: (%s)" % (self.pattern, self.action)
+
+    def __repr__(self):
+        return self.__str__()
+
+def minimize_bones(bones):
+    '''
+    Attempt to remove redundant bones---e.g. those shadowed by
+    bones earlier in the list.  This function is O(n^2) in the
+    length of the list.
+
+    ARGS
+        bones: a list of Bones, where the action is an Action.
+
+    '''
+    if len(bones) < 2:
+        return bones
+
+    # Remove any bone completely shadowed by a previous bone.
+    to_be_removed = []
+    for i in xrange(len(bones) - 1):
+        for j in xrange(i+1, len(bones)):
+            if pattern_is_subset(bones[j].pattern, bones[i].pattern):
+                to_be_removed.append(j)
+
+    new_bones = []
+    for i in xrange(len(bones)):
+        if i not in to_be_removed:
+            new_bones.append(bones[i])
+
+    # Starting at the bottom and working backwards, remove any bone
+    # that is immediately redundant.
+    # i.e. with
+    #   VLAN = 1 : DROP
+    #   *        : DROP
+    # becomes
+    #   *        : DROP
+    i = 1
+    while i < len(new_bones) - 1:
+        if (new_bones[-i].action == new_bones[-(i+1)].action 
+            and pattern_is_subset(new_bones[-(i+1)].pattern, new_bones[-i].pattern)):
+            del new_bones[-(i+1)]
+        else:
+            i += 1
+
+    return new_bones
+
 
 def bones_cross_product(bones1, bones2, f1):
-    '''Return the cross product of the two lists of bones, using functions f1,
-    f2, and f3 to join the fields of each Bone.'''
+    '''Return the cross product of the two lists of bones, using function f1
+    to join the actions of each Bone.'''
+    # TODO: remove
+    global log
+    log.write('--------------\n')
+    log.write('%s\nINTERSECT\n%s\n' % (bones1, bones2))
+    log.write('======\n')
     # Pattern intersection
     def pattern_and(p1, p2):
         p = p2.copy()
-        for k in p1:
-            if k in p2:
-                raise ConstraintException("Bottom pattern.")
+        for field in p1:
+            if field not in p2:
+                p[field] = p1[field]
+            elif p1[field] == p2[field]:
+                continue
             else:
-                p[k] = p1[k]
+                raise ConstraintException("Bottom pattern.")
         return p
 
     bones = []
     for b1 in bones1:
         for b2 in bones2:
             try:
-                bones.append(Bone(pattern_and(b1.pattern, b2.pattern),
-                              f1(b1.action, b2.action)))
+                newBone = Bone(pattern_and(b1.pattern, b2.pattern),
+                               f1(b1.action, b2.action))
+                bones.append(newBone)
             except ConstraintException:
                 continue
-    return bones
+    #TODO: remove
+    log.write('%s\n' % bones)
+    return minimize_bones(bones)
 
 def compile_bones_intersection(bones1, bones2):
     return bones_cross_product(bones1, bones2,
@@ -144,18 +205,18 @@ def compile_predicate_header(switch, header):
       }
 
     # Disallow wildcards for now
-    try:
-        if header.field != 'loc':
-            int(header.pattern)
-    except ValueException:
-        raise ConstraintException(
-          "Pattern in '%s' is not a number (wildcards currently disallowed)." % header)
+#    try:
+#        if header.field != 'loc':
+#            int(header.pattern)
+#    except ValueError:
+#        raise ConstraintException(
+#          "Pattern in '%s' is not a number (wildcards currently disallowed)." % header)
 
     # Location is a special case.  Morally, return
     # (switch : sw) /\ (port : p).
     if header.field == 'loc':
         sw,p = header.pattern
-        switchMatches = sw == switch or sw == 0
+        switchMatches = (sw == switch or sw == 0)
         if p != 0:
             d = {policy.IN_PORT : p}
             return [Bone(d, switchMatches), Bone({}, False)]
@@ -180,15 +241,15 @@ def compile_predicate(switch, p):
     if isinstance(p, netcore.Top):
         return [Bone({}, True)]
     elif isinstance(p, netcore.Bottom):
-        raise ConstraintException("'Bottom' predicate not supported.")
+        raise [Bone({}, False)]
     elif isinstance(p, netcore.Header):
         return compile_predicate_header(switch, p)
     elif isinstance(p, netcore.Union):
         return compile_binary_predicate(switch, p, compile_bones_union)
     elif isinstance(p, netcore.Intersection):
-        return compile_binary_predicate(switch, p, compile_predicate_intersection)
+        return compile_binary_predicate(switch, p, compile_bones_intersection)
     elif isinstance(p, netcore.Difference):
-        return compile_binary_predicate(switch, p, compile_predicate_difference)
+        return compile_binary_predicate(switch, p, compile_bones_difference)
     else:
         raise ConstraintException("Unsupported predicate: %s" % p)
 
@@ -201,7 +262,7 @@ def compile_action(action):
 
     # Convert any modify actions
     for k,v in action.modify.iteritems():
-        newActions.append(policy.modify(k,v))
+        newActions.append(policy.modify((k,v)))
     
     # Convert the forward action
     for p in action.ports:
@@ -234,12 +295,12 @@ def action_union(a1, a2):
         ports = list(a1.ports)
         ports.extend(a2.ports)
         return netcore.Action(switch, ports, a1.modify.copy())
-    elif len(a2.ports) == 0 and a1.modify != a2.modify:
+    elif len(a1.ports) == 0 and a1.modify != a2.modify:
         assert(a1.switch is None or a2.switch is None or a1.switch == a2.switch)
         switch = a1.switch if a1.switch else a2.switch
         ports = list(a1.ports)
         ports.extend(a2.ports)
-        return netcore.Action(a1.switch, ports, a2.modify.copy())
+        return netcore.Action(switch, ports, a2.modify.copy())
     else:
         raise ConstraintException("Unsupported union of two Actions.")
 
@@ -285,6 +346,8 @@ def compile_policy(switch, p):
         return compile_policy_union(switch, p)
     elif isinstance(p, netcore.PolicyRestriction):
         return compile_policy_restriction(switch, p)
+    elif isinstance(p, netcore.BottomPolicy):
+        return [Bone({}, netcore.Action(False))]
     else:
         raise ConstraintException("Unsupported policy type: %s" % p)
 
@@ -299,43 +362,10 @@ def pattern_is_subset(smaller, larger):
     for k in smaller:
         if k in larger and larger[k] != smaller[k]:
             return False
+    for k in larger:
+        if k not in smaller:
+            return False
     return True
-
-def minimize_bones(bones):
-    '''
-    Attempt to remove redundant bones---e.g. those shadowed by
-    bones earlier in the list.  This function is O(n^2) in the
-    length of the list.
-
-    ARGS
-        bones: a list of Bones, where the action is an Action.
-
-    '''
-    if len(bones) < 2:
-        return bones
-
-    # Try two optimizations.  First, remove any bone completely shadowed
-    # by a previous bone.  Second, if a rule that drops packets doesn't
-    # overlap with any subsequent rules, remove it and add a final
-    # catch-all DROP rule.
-    to_be_removed = []
-    for i in xrange(len(bones) - 1):
-        drop = len(bones[i].action.ports) == 0
-        for j in xrange(i+1, len(bones)):
-            if pattern_is_subset(bones[j].pattern, bones[i].pattern):
-                to_be_removed.append(j)
-            elif drop and patterns_overlap(bones[i].pattern, bones[j].pattern):
-                drop = False
-        if drop:
-            to_be_removed.append(i)
-
-    new_bones = []
-    for i in xrange(len(bones)):
-        if i not in to_be_removed:
-            new_bones.append(bones[i])
-    if new_bones[-1].action.ports != []:
-        new_bones.append(Bone({}, netcore.Action(None)))
-    return new_bones
 
 def translate_bones_to_rules(bones):
     '''
@@ -349,6 +379,69 @@ def translate_bones_to_rules(bones):
             for p, acts 
             in map(lambda b: (b.pattern, compile_action(b.action)), bones)]
 
+def prune_predicate(switch, pred):
+    assert(isinstance(pred, netcore.Predicate))
+    if isinstance(pred, netcore.Top) or isinstance(pred, netcore.Bottom):
+        return pred
+    elif isinstance(pred, netcore.Header):
+        if pred.field == 'loc' and pred.pattern[0] != switch:
+            return netcore.Bottom()
+        return pred
+    elif isinstance(pred, netcore.Union):
+        p1 = prune_predicate(switch, pred.left)
+        p2 = prune_predicate(switch, pred.right)
+        if isinstance(p1, netcore.Bottom):
+            return p2
+        elif isinstance(p2, netcore.Bottom):
+            return p1
+        return netcore.Union(p1, p2)
+    elif isinstance(pred, netcore.Intersection):
+        p1 = prune_predicate(switch, pred.left)
+        p2 = prune_predicate(switch, pred.right)
+        if isinstance(p1, netcore.Bottom) or isinstance(p2, netcore.Bottom):
+            return netcore.Bottom()
+        return netcore.Intersection(p1, p2)
+    elif isinstance(pred, netcore.Difference):
+        p1 = prune_predicate(switch, pred.left)
+        p2 = prune_predicate(switch, pred.right)
+        if isinstance(p1, netcore.Bottom):
+            return netcore.Bottom()
+        elif isinstance(p2, netcore.Bottom):
+            return p1
+        return netcore.Difference(p1, p2)
+    else:
+        raise ConstraintException("Unsupported predicate: %s" % p)
+
+def prune_policy(switch, pol):
+    assert(isinstance(pol, netcore.Policy))
+    if isinstance(pol, netcore.BottomPolicy):
+        return pol
+    elif isinstance(pol, netcore.PrimitivePolicy):
+        pred = prune_predicate(switch, pol.predicate)
+        if isinstance(pred, netcore.Bottom):
+            return netcore.BottomPolicy()
+        return netcore.PrimitivePolicy(pred, pol.action)
+    elif isinstance(pol, netcore.PolicyUnion):
+        p1 = prune_policy(switch, pol.left)
+        p2 = prune_policy(switch, pol.right)
+        if isinstance(p1, netcore.BottomPolicy):
+            return p2
+        elif isinstance(p2, netcore.BottomPolicy):
+            return p1
+        return netcore.PolicyUnion(p1, p2)
+    elif isinstance(pol, netcore.PolicyRestriction):
+        p1 = prune_policy(switch, pol.policy)
+        pred = prune_predicate(switch, pol.predicate)
+        if isinstance(pred, netcore.Top):
+            return p1
+        elif isinstance(pred, netcore.Bottom):
+            return netcore.BottomPolicy()
+        elif isinstance(p1, netcore.BottomPolicy):
+            return p1
+        return netcore.PolicyRestriction(p1, pred)
+    else:
+        raise ConstraintException("Unsupported policy: %s" % p)
+
 def compile(topo, pol):
     '''
     Compile a netcore.Policy and a topology to a policy.NetworkPolicy.
@@ -361,11 +454,16 @@ def compile(topo, pol):
         a policy.NetworkPolicy object.
 
     '''
+    # TODO: remove
+    global log
+    log = open('/home/openflow/isolization-master/log.tmp', 'w')
     networkConfig = policy.NetworkPolicy()
-    for switch in topo:
+    for switch in topo.switches():
+        pruned_policy = prune_policy(switch, pol)
         bones = compile_policy(switch, pol)
-        bones = minimize_bones(bones)
         rules = translate_bones_to_rules(bones)
         networkConfig.set_configuration(switch, policy.SwitchConfiguration(rules))
+    # TODO: remove
+    log.close()
     return networkConfig
 

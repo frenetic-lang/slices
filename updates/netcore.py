@@ -73,10 +73,23 @@ class Top(Predicate):
     def get_physical_predicate(self, port_map, switch_map):
         return Top()
 
+    def __str__(self):
+        return "Top"
+
+    def __repr__(self):
+        return self.__str__()
+
 class Bottom(Predicate):
     """The always-false predicate."""
     def get_physical_predicate(self, port_map, switch_map):
         return Bottom()
+    def match(self, packet, (switch, port)):
+        return False
+    def __str__(self):
+        return "Bottom"
+    def __repr__(self):
+        return self.__str__()
+
 
 HEADER_FIELDS = set (['loc', # See Header for special note about this value
                       'srcmac',
@@ -105,6 +118,12 @@ class Header(Predicate):
         """
         self.field = field
         self.pattern = pattern
+
+    def __str__(self):
+        return "%s : %s" % (self.field, self.pattern)
+
+    def __repr__(self):
+        return self.__str__()
 
     def get_physical_predicate(self, port_map, switch_map):
         """ Creates a copy of this Predicate in which all logical
@@ -155,6 +174,12 @@ class Union(Predicate):
         """
         self.left = left
         self.right = right
+
+    def __str__(self):
+        "Union\n%s\n%s" % (self.left, self.right)
+
+    def __repr__(self):
+        self.__str__()
 
     def get_physical_predicate(self, port_map, switch_map):
         """ Creates a copy of this Predicate in which all logical
@@ -209,6 +234,12 @@ class Intersection(Predicate):
         self.left = left
         self.right = right
 
+    def __str__(self):
+        return "Intersection\n%s\n%s" % (self.left, self.right)
+
+    def __repr__(self):
+        return self.__str__()
+
     def get_physical_predicate(self, port_map, switch_map):
         """ Creates a copy of this Predicate in which all logical
         ports and switches have been mapped to their physical
@@ -241,6 +272,12 @@ class Difference(Predicate):
         """
         self.left = left
         self.right = right
+
+    def __str__(self):
+        return "Difference\n%s\n%s" % (self.left, self.right)
+
+    def __repr__(self):
+        return self.__str__()
 
     def get_physical_predicate(self, port_map, switch_map):
         """ Creates a copy of this Predicate in which all logical
@@ -281,6 +318,12 @@ class Action:
         self.switch = switch
         self.ports = ports
         self.modify = modify
+
+    def __str__(self):
+        return "%s: %s %s" % (self.switch, self.modify, self.ports)
+
+    def __repr__(self):
+        return self.__str__()
 
     def modify_packet(self, packet):
         """Modify packet with this action's modify pattern.
@@ -329,6 +372,18 @@ class Policy:
         """Get set of (pkt, loc) this policy generates for a located packet."""
         pass
 
+class BottomPolicy(Policy):
+    """Policy that drops everything."""
+    def get_physical_rep(self, port_map, switch_map):
+        return self
+    def get_actions(self, packet, loc):
+        return []
+    def __str__(self):
+        return "BottomPolicy"
+    def __repr__(self):
+        return self.__str__()
+
+
 class PrimitivePolicy(Policy):
     """Policy for mapping a single predicate to an action."""
     def __init__(self, predicate, action):
@@ -342,6 +397,12 @@ class PrimitivePolicy(Policy):
         """
         self.predicate = predicate
         self.action = action
+
+    def __str__(self):
+        return "PrimitivePolicy\n%s\n%s" % (self.predicate, self.action)
+
+    def __repr__(self):
+        return self.__str__()
 
     def get_physical_rep(self, port_map, switch_map):
         """ Creates a copy of this object in which all logical
@@ -376,6 +437,12 @@ class PolicyUnion(Policy):
         """
         self.left = left
         self.right = right
+
+    def __str__(self):
+        return "PolicyUnion\n%s\n%s" % (self.left, self.right)
+
+    def __repr__(self):
+        return self.__str__()
 
     def get_physical_rep(self, port_map, switch_map):
         """ Creates a copy of this object in which all logical
@@ -423,6 +490,12 @@ class PolicyRestriction(Policy):
         """
         self.policy = policy
         self.predicate = predicate
+
+    def __str__(self):
+        return "PolicyRestriction\n%s\n%s" % (self.left, self.right)
+
+    def __repr__(self):
+        return self.__str__()
 
     def get_physical_rep(self, port_map, switch_map):
         """ Creates a copy of this object in which all logical
