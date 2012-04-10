@@ -39,7 +39,7 @@ def get_slices():
                                                nc.Header('dstport', 80)]),
                           p_topo)]
 
-    return slic_list
+    return (p_topo, slic_list)
 
 def getSlice(l_sLeft, l_sMid, l_sRight, l_hLeft, l_hRight, adj, policy, p_topo):
     # Slice of form
@@ -104,4 +104,4 @@ def addHostPortToMap(s, h_l, h_p, p_map, s_map, l_topo, p_topo):
     val = (sp, p_topo.node[sp]['ports'][h_p])
     p_map[key] = val
 
-get_slices()
+# get_slices()

@@ -62,6 +62,8 @@ physical counterparts as provided by the slice's mapping.
 
 import copy
 import netcore as nc
+import slicing
+import netcore
 
 class VlanException(Exception):
     """Exception to represent failure to map to VLAN tags."""
@@ -88,16 +90,16 @@ def transform(slices):
         # Produce a separate policy that adds vlan tags to safe incoming packets
         inport_policy = external_to_vlan_policy(slic, policy, vlan)
         # Take their union
-        safe_inport_policy = nc.PolicyUnion(safe_outport_policy, inport_policy)
+        safe_inport_policy = nc.PolicyUnion(safe_policy, inport_policy)
 
         # Modify the result to strip the vlan tag from outbound ports
         # Note that this should be the last step.  If our policy takes an
         # incoming packet and forwards it directly out, we should still remove
         # its vlan tag.
-        full_policy = internal_strip_vlan_policy(slic, safe_policy)
+        full_policy = internal_strip_vlan_policy(slic, safe_inport_policy)
 
         policy_list.append(
-            full_policy.get_physical_rep(slic.port_map, slic.switch_map))
+            full_policy.get_physical_rep(slic.port_map, slic.node_map))
         vlan += 1
     return nc.nary_policy_union(policy_list)
 
@@ -112,7 +114,7 @@ def isolated_policy(policy, vlan):
         a new policy object that is slic's policy but restricted to its vlan.
     """
     vlan_predicate = nc.Header('vlan', vlan)
-    return nc.Intersection(vlan_predicate, policy)
+    return nc.PolicyRestriction(policy, vlan_predicate)
 
 def external_predicate((switch, port), predicate):
     """Produce a predicate that matches predicate incoming on (switch, port).
@@ -143,19 +145,46 @@ def modify_vlan(policy, vlan):
 
 def strip_vlan(policy, (switch, port)):
     """Re-write all actions of policy to set vlan to 0 on switch, port."""
+    assert(isinstance(policy, netcore.Policy))
     if isinstance(policy, nc.PrimitivePolicy):
         actions = copy.copy(policy.actions)
+        lastAction = None
         for action in actions:
-            if action.switch == switch and action.port == port:
+            # Skip over new actions we just inserted
+            if action == lastAction:
+                continue
+            lastAction = action
+
+            # A switch may forward multiple packets out the same port.
+            portMatches = [p for p in action.ports if p == port]
+
+            if action.switch == switch and action.ports == portMatches:
+                # If this policy does nothing but forward out the
+                # egress port, then just update the vlan.
                 action.modify['vlan'] = 0
+            elif action.switch == switch and port in action.ports:
+                # Otherwise:
+                # 1) Remove port from action.ports,
+                # 2) Copy this action, then set ports = [port] and VLAN = 0 
+                #    in the copy.
+                # 3) Insert the copy immediately after the current action.
+                while port in action.ports:
+                    action.ports.remove(port)
+                newAction = copy.copy(action)
+                newAction.ports = portMatches
+                newAction.modify['vlan'] = 0
+                actions.insert(actions.index(action) + 1, newAction)
+                lastAction = newAction
         return nc.PrimitivePolicy(policy.predicate, actions)
     elif isinstance(policy, nc.PolicyUnion):
         left = strip_vlan(policy.left, (switch, port))
         right = strip_vlan(policy.right, (switch, port))
         return nc.PolicyUnion(left, right)
-    else: # isinstance(policy, nc.PolicyRestriction)
+    elif isinstance(policy, nc.PolicyRestriction):
         new_policy = strip_vlan(policy.policy, (switch, port))
         return nc.PolicyRestriction(new_policy, policy.predicate)
+    else:
+        raise Exception("Unexpected policy: %s\n" % policy)
 
 def external_to_vlan_policy(slic, policy, vlan):
     """Produce a policy that moves packets along external ports into the vlan.
@@ -173,8 +202,10 @@ def external_to_vlan_policy(slic, policy, vlan):
         A policy that moves packets incoming to external ports into the vlan,
         but only if they satisfy the slice's isolation predicates.
     """
+    assert(isinstance(slic, slicing.Slice))
+    assert(isinstance(policy, netcore.Policy))
     external_predicates = [external_predicate(loc, pred)
-                           for loc, pred in slic.edge_policy]
+                           for loc, pred in slic.edge_policy.iteritems()]
     predicate = nc.nary_union(external_predicates)
     policy_into_vlan = modify_vlan(policy, vlan)
     return nc.PolicyRestriction(policy_into_vlan, predicate)
@@ -189,6 +220,6 @@ def internal_strip_vlan_policy(slic, policy):
                 [act.set_vlan(0) for act in acts]
             return acts
     """
-    for ((switch, port), _) in slic.edge_policy:
+    for ((switch, port), _) in slic.edge_policy.iteritems():
         policy = strip_vlan(policy, (switch, port))
     return policy

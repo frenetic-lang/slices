@@ -116,6 +116,9 @@ class Header(Predicate):
                 where it's (switch, port), where both are ints, with 0
                 representing a wildcard.
         """
+        assert(field in HEADER_FIELDS)
+        if field == 'loc':
+            assert(len(pattern) == 2)
         self.field = field
         self.pattern = pattern
 
@@ -141,12 +144,13 @@ class Header(Predicate):
         counterparts
         """
         if self.field == 'loc':
+            assert(len(self.pattern) == 2)
             switch = 0
             if self.pattern[0] != 0:
                 switch = switch_map[self.pattern[0]]
             port = 0
             if self.pattern[1] != 0:
-                port = port_map[self.pattern[1]]
+                _,port = port_map[(self.pattern[0], self.pattern[1])]
             return Header(self.field, (switch, port))
         return Header(self.field, self.pattern)
 
@@ -172,11 +176,13 @@ class Union(Predicate):
             left: first predicate to union
             right: second predicate to union
         """
+        assert(isinstance(left, Predicate))
+        assert(isinstance(right, Predicate))
         self.left = left
         self.right = right
 
     def __str__(self):
-        "Union\n%s\n%s" % (self.left, self.right)
+        return "Union\n%s\n%s" % (self.left, self.right)
 
     def __repr__(self):
         self.__str__()
@@ -231,6 +237,8 @@ class Intersection(Predicate):
             left: first predicate to intersection
             right: second predicate to intersection
         """
+        assert(isinstance(left, Predicate))
+        assert(isinstance(right, Predicate))
         self.left = left
         self.right = right
 
@@ -270,6 +278,8 @@ class Difference(Predicate):
             left: set to subtract from
             right: set to subtract
         """
+        assert(isinstance(left, Predicate))
+        assert(isinstance(right, Predicate))
         self.left = left
         self.right = right
 
@@ -342,7 +352,7 @@ class Action:
 
     def get_physical_rep(self, port_map, switch_map):
         """Return this action mapped to a physical network."""
-        p_ports = [port_map[p] for p in self.ports]
+        p_ports = [port_map[(self.switch, p)] for p in self.ports]
         return Action(switch_map[self.switch], p_ports, self.modify)
 
 class Policy:
@@ -385,21 +395,25 @@ class BottomPolicy(Policy):
 
 
 class PrimitivePolicy(Policy):
-    """Policy for mapping a single predicate to an action."""
-    def __init__(self, predicate, action):
+    """Policy for mapping a single predicate to a list of actions."""
+    def __init__(self, predicate, actions):
         """
         ARGS:
             predicate: predicate under which to apply action
-            action: an Action to apply to packets which match predicate,
-                all modifications and forwads are applied, resulting in 
-                potentially multiple packets.  Note that Action.ports may 
-                be the empty list.
+            actions: a list of Actions to apply to packets which match 
+                predicate.  Each action is applied to such a
+                packet, first effecting any modifications in the action, then
+                forwarding out any given ports, before applying the next
+                action.  In this way, a PrimitivePolicy may result in multiple
+                packets.  Note that actions may be the empty list.
         """
+        assert(isinstance(predicate, Predicate))
+        assert(isinstance(actions, type([])))
         self.predicate = predicate
-        self.action = action
+        self.actions = actions
 
     def __str__(self):
-        return "PrimitivePolicy\n%s\n%s" % (self.predicate, self.action)
+        return "PrimitivePolicy\n%s\n%s" % (self.predicate, self.actions)
 
     def __repr__(self):
         return self.__str__()
@@ -420,12 +434,16 @@ class PrimitivePolicy(Policy):
         counterparts
         """
         p_pred = self.predicate.get_physical_predicate(port_map, switch_map)
-        p_act = self.action.get_physical_rep(port_map, switch_map)
+        p_act = [action.get_physical_rep(port_map, switch_map) for action in self.actions]
         return PrimitivePolicy(p_pred, p_act)
 
     def get_actions(self, packet, loc):
         if self.predicate.matches(packet, loc):
-            return [self.action.modify(packet) for p in self.action.ports]
+            returned_packets = []
+            for action in self.actions:
+                p = action.modify(packet)
+                returned_packets += [p for n in action.ports]
+            return returned_packets
 
 class PolicyUnion(Policy):
     """The union of two policies."""
@@ -435,6 +453,8 @@ class PolicyUnion(Policy):
             left: first policy to union
             right: second policy to union
         """
+        assert(isinstance(left, Policy))
+        assert(isinstance(right, Policy))
         self.left = left
         self.right = right
 
@@ -488,11 +508,13 @@ class PolicyRestriction(Policy):
             policy: policy to restrict
             predicate: predicate to restrict it by
         """
+        assert(isinstance(policy, Policy))
+        assert(isinstance(predicate, Predicate))
         self.policy = policy
         self.predicate = predicate
 
     def __str__(self):
-        return "PolicyRestriction\n%s\n%s" % (self.left, self.right)
+        return "PolicyRestriction\n%s\n%s" % (self.predicate, self.policy)
 
     def __repr__(self):
         return self.__str__()
