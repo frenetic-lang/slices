@@ -55,9 +55,9 @@ def blue_slice(p_topo):
             
         for ep in l_topo.edge_ports(s):
             if i == 2:
-                preds[s,ep] = nc.Header("srcport", 80)
+                preds[(s,ep)] = nc.Header("srcport", 80) #TODO define
             else:
-                preds[s,ep] = nc.Header("dstport", 80)
+                preds[(s,ep)] = nc.Header("dstport", 80)
 
     return slicing.Slice(l_topo, p_topo, s_map, p_map, preds)
 
@@ -85,14 +85,37 @@ def red_slice(p_topo):
     l_topo.add_switch("R1")
     l_topo.add_switch("R2")
     l_topo.add_link("R1","R2")
+
+    for i in range(1,3):
+        for j in range (1,4):
+            s = "R" + str(i)
+            h = s + "_" + str(j)
+            l_topo.add_host(h)
+            l_topo.add_link(s,h)
+
     l_topo.finalize()
 
     s_map = {"R1":"S1","R2":"S2"}
 
     p_map = {}
     add_to_port_map("R2","R1",p_map,s_map,l_topo,p_topo)
+    preds ={}
 
-    return slicing.Slice(l_topo, p_topo, s_map, p_map, {})
+    # Map edge ports and add predicates
+    for i in range(1,3):
+        for j in range(1,4):
+            s = "R" + str(i)
+            h_l = s + "_" + str(j)
+            h_p = "S" + str(i) + "_" + str(j)
+            add_host_port_to_map(s, h_l, h_p, p_map, s_map, l_topo, p_topo)
+            
+        for ep in l_topo.edge_ports(s):
+            if i == 1:
+                preds[(s,ep)] = nc.Header("srcport", 80)
+            else:
+                preds[(s,ep)] = nc.Header("dstport", 80)
+
+    return slicing.Slice(l_topo, p_topo, s_map, p_map, preds)
 
 def add_to_port_map(s1, s2, p_map, s_map, l_topo, p_topo):
     s1p = s_map[s1]
