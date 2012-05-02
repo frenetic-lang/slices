@@ -4,12 +4,12 @@ import netcore
 
 def get_slices():
     p_topo = nxtopo.NXTopo()
-    for i in range(1,5):
+    for i in range(1,6):
         p_topo.add_switch(i)
         for j in range(1,i):
             p_topo.add_link(i,j)
 
-    for i in range(6,10):
+    for i in range(6,11):
         p_topo.add_host(i)
         p_topo.add_link(i-5, i)
 
@@ -61,9 +61,24 @@ def get_slices():
         slic = slicing.Slice(l_topo, p_topo, s_map, p_map,
                              {ep1 : policy, ep2 : policy})
         slices.append(slic)
-
+    
+    slices.append(getIsolatedFella(p_topo))
 
     return slices
+
+def getIsolatedFella(p_topo):
+    #Add our new isolated fella
+    l_topo = nxtopo.NXTopo()
+    l_topo.add_switch(35)
+    l_topo.add_host(40)
+    l_topo.add_link(35, 40)
+    l_topo.finalize()
+    
+    l_port = (35, l_topo.node[35]['ports'][40])
+    p_port = (5, p_topo.node[5]['ports'][10])
+    
+    return slicing.Slice(l_topo, p_topo, {35:5}, {l_port:p_port},
+                         {l_port:netcore.Header('srcport', 80)})
 
 def addToPortMap(s1, s2, p_map, s_map, l_topo, p_topo):
     s1p = s_map[s1]
