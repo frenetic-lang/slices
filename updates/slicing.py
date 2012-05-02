@@ -42,6 +42,18 @@ def is_injective(mapping):
     codomain = set(mapping.values())
     return len(mapping) == len(codomain)
 
+def assert_is_injective(mapping):
+    """Asserts that a mapping is injective.
+
+    ARGS:
+        mapping: map to check
+    """
+    checked = set()
+    for vlu in mapping.values():
+        assert vlu not in checked, \
+            str(vlu) + " occurs more than once in the domain"
+        checked.add(vlu)
+
 def policy_is_total(edge_policy, topo):
     """Determine if an edge policy covers all edge ports.
 
@@ -66,6 +78,28 @@ def policy_is_total(edge_policy, topo):
             if not (switch, port) in port_set:
                 return False
     return True
+
+def assert_policy_is_total(edge_policy, topo):
+    """Determine if an edge policy covers all edge ports and raises an
+    AssertionError if it doesn't
+
+    ARGS:
+        edge_policy:  collection of (edge_port, predicate) pairs that represents
+            a slice's policy for ingress edges
+        topo: NXTopo to which edge_policy applies
+    """
+    port_set = set()
+
+    for edge_port in edge_policy.keys():
+        predicate = edge_policy[edge_port]
+        #Do we want this?
+        assert predicate is not None, \
+            "port " + str(edge_port) + " has null edge predicate"
+        port_set.add(edge_port)
+    for switch in topo.edge_switches():
+        for port in topo.edge_ports(switch):
+            assert (switch, port) in port_set, \
+                "port " + str((switch, port)) + "  has no edge predicate"
 
 class Slice:
     """Data structure to represent virtual network slices."""
@@ -107,9 +141,9 @@ class Slice:
         """
 
         ports = set()
-        for s in self.l_topo.switches():
-            for p in self.l_topo.node[s]['ports'].values():
-                ports.add((s,p))
+        for switch in self.l_topo.switches():
+            for port in self.l_topo.node[switch]['ports'].values():
+                ports.add((switch, port))
                 
       #  print self.l_topo.switches() == self.node_map.keys()
       #  print ports == set(self.port_map.keys())
