@@ -49,9 +49,9 @@ def assert_is_injective(mapping):
         mapping: map to check
     """
     checked = set()
+    err = "%s occurs more than once in the domain"
     for vlu in mapping.values():
-        assert vlu not in checked, \
-            str(vlu) + " occurs more than once in the domain"
+        assert vlu not in checked, err % str(vlu)
         checked.add(vlu)
 
 def policy_is_total(edge_policy, topo):
@@ -90,16 +90,16 @@ def assert_policy_is_total(edge_policy, topo):
     """
     port_set = set()
 
+    err = "port %s has null edge predicate"
     for edge_port in edge_policy.keys():
         predicate = edge_policy[edge_port]
         #Do we want this?
-        assert predicate is not None, \
-            "port " + str(edge_port) + " has null edge predicate"
+        assert predicate is not None, err % str(edge_port)
         port_set.add(edge_port)
+    err =  "port %s  has no edge predicate"
     for switch in topo.edge_switches():
         for port in topo.edge_ports(switch):
-            assert (switch, port) in port_set, \
-                "port " + str((switch, port)) + "  has no edge predicate"
+            assert (switch, port) in port_set, err % str((switch, port))
 
 class Slice:
     """Data structure to represent virtual network slices."""
