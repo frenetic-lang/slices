@@ -43,5 +43,23 @@ class TestSlice(unittest.TestCase):
         self.assertFalse(slicing.is_injective({1:1, 2:2, 3:3, 4:2, 5:3}))
         self.assertFalse(slicing.is_injective({1:1, 2:2, 3:3, 4:3, 5:3}))
 
+    def test_assert_is_injective(self):
+        slicing.assert_is_injective({})
+        slicing.assert_is_injective({1:1, 2:2, 3:3, 4:4})
+        slicing.assert_is_injective({1:4, 2:5, 3:2, 4:7})
+
+    def test_assert_not_is_injective(self):
+        self.assertRaises(AssertionError, 
+                          slicing.assert_is_injective,{1:1, 2:1})
+        self.assertRaises(AssertionError, 
+                          slicing.assert_is_injective,{1:1, 2:2, 3:3, 4:4, 5:3})
+        self.assertRaises(AssertionError, 
+                          slicing.assert_is_injective,{1:1, 2:2, 3:3, 4:2, 5:3})
+        self.assertRaises(AssertionError, 
+                          slicing.assert_is_injective,{1:1, 2:2, 3:3, 4:3, 5:3})
+        
+    def test_policy_is_total(self):
+        pass
+        
 if __name__ == '__main__':
     unittest.main()
