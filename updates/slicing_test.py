@@ -131,10 +131,39 @@ class TestSlice(unittest.TestCase):
         self.assertRaises(AssertionError,
                           slicing.assert_policy_is_total, pol, topo)
 
-    def test_examples(self):
-        pass
-        # Maintains examples
+    def test_assert_set_equals(self):
+        slicing.assert_set_equals(set([]),set([]))
+        slicing.assert_set_equals(set([1, 2, 3]),set([1, 2, 3]))
+        slicing.assert_set_equals(set([1]),set([1]))
+
+    def test_assert_not_set_equals(self):
+        def helper(lst1, lst2):
+            self.assertRaises(AssertionError, 
+                              slicing.assert_set_equals, set(lst1), set(lst2))
+            self.assertRaises(AssertionError, 
+                              slicing.assert_set_equals, set(lst2), set(lst1))
+        # test fucntioning    
+        helper([],[1])
+        helper([0],[1])
+        helper([0,2,3],[0,2])
+        helper([0,2,3],[0,2,4])
+        helper([1,2],[1])
+        helper([0,3,4],[1,2,5])
+
+        # test type safety
+        self.assertRaises(AssertionError, 
+                          slicing.assert_set_equals, [1], [1])
+        self.assertRaises(AssertionError, 
+                          slicing.assert_set_equals, set([1]), [1])
+        self.assertRaises(AssertionError, 
+                          slicing.assert_set_equals, [1], set([1]))
         
+    def test_examples(self):
+        # Maintains examples
+        self.assertEquals(3, len(mil_ex.get_slices()))
+        self.assertEquals(3, len(amaz_ex.get_slices()[1]))
+        self.assertEquals(1, len(simple_ex.get_slices()))
+        self.assertEquals(3, len(day_ex.get_slices()))
 
 def total_policy_topo():
     topo = nxtopo.NXTopo()

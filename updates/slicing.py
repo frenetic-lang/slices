@@ -101,6 +101,19 @@ def assert_policy_is_total(edge_policy, topo):
         for port in topo.edge_ports(switch):
             assert (switch, port) in port_set, err % str((switch, port))
 
+def assert_set_equals(set1, set2):
+    err =  "%s in 1st set but not 2nd"
+    assert type(set1) is set
+    assert type(set2) is set
+    if(len(set1) < len(set2)):
+        temp = set1
+        set1 = set2
+        set2 = temp
+        err =  "%s in 2nd set but not 1st"
+
+    for entry in set1:
+        assert entry in set2, err % str(entry)
+  
 class Slice:
     """Data structure to represent virtual network slices."""
     def __init__(self, logical_topology, physical_topology, node_map, port_map,

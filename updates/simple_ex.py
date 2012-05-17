@@ -2,7 +2,7 @@ import nxtopo
 import slicing
 import netcore as nc
 
-def get_slice():
+def get_slices():
 
     # Create the physical topology
     p_topo = nxtopo.NXTopo()
@@ -28,9 +28,9 @@ def get_slice():
     port_map[get_port(13, 12, l_topo)] = get_port(3, 2, p_topo)
 
     # Create and return slice
-    return slicing.Slice(l_topo, p_topo, switch_map, port_map, dict())
+    return [slicing.Slice(l_topo, p_topo, switch_map, port_map, dict())]
 
 def get_port(src, dest, topo):
     return (src, topo.node[src]['ports'][dest])
 
-get_slice()
+get_slices()
