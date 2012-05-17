@@ -30,6 +30,8 @@
 ################################################################################
 import slicing
 import unittest
+import nxtopo
+import netcore
 
 class TestSlice(unittest.TestCase):
     def test_is_injective(self):
@@ -59,7 +61,85 @@ class TestSlice(unittest.TestCase):
                           slicing.assert_is_injective,{1:1, 2:2, 3:3, 4:3, 5:3})
         
     def test_policy_is_total(self):
-        pass
-        
+        topo = total_policy_topo()
+        pred = netcore.Header('srcport', 80)
+        # Edge ports:
+        # (1, 3)
+        # (1, 4)
+        # (2, 3)
+        # (3, 3)
+        pol = {(1,3):pred,(1,4):pred,(2,3):pred,(3,3):pred}
+
+        self.assertTrue(slicing.policy_is_total(pol,topo))
+  
+    def test_assert_policy_is_total(self):
+        topo = total_policy_topo()
+        pred = netcore.Header('srcport', 80)
+        # Edge ports:
+        # (1, 3)
+        # (1, 4)
+        # (2, 3)
+        # (3, 3)
+        pol = {(1,3):pred,(1,4):pred,(2,3):pred,(3,3):pred}
+        slicing.assert_policy_is_total(pol ,topo)
+
+    def test_policy_is_total(self):
+        topo = total_policy_topo()
+        pred = netcore.Header('srcport', 80)
+        # Edge ports:
+        # (1, 3)
+        # (1, 4)
+        # (2, 3)
+        # (3, 3)
+
+        pol = {}
+        self.assertFalse(slicing.policy_is_total(pol, topo))
+
+        pol = {(1,3):pred}
+        self.assertFalse(slicing.policy_is_total(pol, topo))
+
+        pol = {(2,3):pred,(3,3):pred}
+        self.assertFalse(slicing.policy_is_total(pol, topo))
+
+        pol = {(1,3):pred,(1,4):pred,(2,3):None,(3,3):pred}
+        self.assertFalse(slicing.policy_is_total(pol, topo))
+
+
+    def test_assert_not_policy_is_total(self):
+        topo = total_policy_topo()
+        pred = netcore.Header('srcport', 80)
+        # Edge ports:
+        # (1, 3)
+        # (1, 4)
+        # (2, 3)
+        # (3, 3)
+
+        pol = {}
+        self.assertRaises(AssertionError,
+                          slicing.assert_policy_is_total, pol, topo)
+        pol = {(1,3):pred}
+        self.assertRaises(AssertionError,
+                          slicing.assert_policy_is_total, pol, topo)
+        pol = {(2,3):pred,(3,3):pred}
+        self.assertRaises(AssertionError,
+                          slicing.assert_policy_is_total, pol, topo)
+        pol = {(1,3):pred,(1,4):pred,(2,3):None,(3,3):pred}
+        self.assertRaises(AssertionError,
+                          slicing.assert_policy_is_total, pol, topo)
+
+def total_policy_topo():
+    topo = nxtopo.NXTopo()
+    for i in range(1,4):
+        topo.add_switch(i)
+        topo.add_host(i + 10)
+        topo.add_link(i, i + 10)
+        for j in range(1,i):
+            topo.add_link(i,j)
+    topo.add_host(10)
+    topo.add_link(1,10)
+    topo.finalize()
+    
+    return topo
+      
 if __name__ == '__main__':
     unittest.main()
