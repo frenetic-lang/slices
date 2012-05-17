@@ -67,7 +67,7 @@ def get_slices():
     return slices
 
 def getIsolatedFella(p_topo):
-    #Add our new isolated fella
+    # Add our new isolated fella
     l_topo = nxtopo.NXTopo()
     l_topo.add_switch(35)
     l_topo.add_host(40)

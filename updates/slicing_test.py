@@ -32,6 +32,10 @@ import slicing
 import unittest
 import nxtopo
 import netcore
+import mil_ex
+import day_ex
+import amaz_ex
+import simple_ex
 
 class TestSlice(unittest.TestCase):
     def test_is_injective(self):
@@ -126,6 +130,11 @@ class TestSlice(unittest.TestCase):
         pol = {(1,3):pred,(1,4):pred,(2,3):None,(3,3):pred}
         self.assertRaises(AssertionError,
                           slicing.assert_policy_is_total, pol, topo)
+
+    def test_examples(self):
+        pass
+        # Maintains examples
+        
 
 def total_policy_topo():
     topo = nxtopo.NXTopo()
