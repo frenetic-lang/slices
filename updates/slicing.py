@@ -102,9 +102,11 @@ def assert_policy_is_total(edge_policy, topo):
             assert (switch, port) in port_set, err % str((switch, port))
 
 def assert_set_equals(set1, set2):
+    err =  "expected <type 'set'>; got %s"
+    assert type(set1) is set, err % str(type(set1))
+    assert type(set2) is set, err % str(type(set2))
+
     err =  "%s in 1st set but not 2nd"
-    assert type(set1) is set
-    assert type(set2) is set
     if(len(set1) < len(set2)):
         temp = set1
         set1 = set2
@@ -140,7 +142,7 @@ class Slice:
         self.node_map = node_map
         self.port_map = port_map
         self.edge_policy = edge_policy
-        assert(self.validate())
+        self.validate()
 
     def validate(self):
         """Check sanity conditions on this slice.
@@ -157,21 +159,16 @@ class Slice:
         for switch in self.l_topo.switches():
             for port in self.l_topo.node[switch]['ports'].values():
                 ports.add((switch, port))
-                
-      #  print self.l_topo.switches() == self.node_map.keys()
-      #  print ports == set(self.port_map.keys())
-      #  print is_injective(self.node_map)
-      #  print is_injective(self.port_map)
-      #  print policy_is_total(self.edge_policy, self.l_topo)
-        
-        assert(self.l_topo.switches() == self.node_map.keys())
-        assert(ports == set(self.port_map.keys()))
-        assert(is_injective(self.node_map))
-        assert(is_injective(self.port_map))
-        assert(policy_is_total(self.edge_policy, self.l_topo))
+                      
+        #  assert(self.l_topo.switches() == self.node_map.keys())
+        #  assert(ports == set(self.port_map.keys()))
+        #  assert(is_injective(self.node_map))
+        #  assert(is_injective(self.port_map))
+        #  assert(policy_is_total(self.edge_policy, self.l_topo))
 
-        return (self.l_topo.switches() == self.node_map.keys() and
-                ports == set(self.port_map.keys()) and
-                is_injective(self.node_map) and
-                is_injective(self.port_map) and
-                policy_is_total(self.edge_policy, self.l_topo))
+        assert_set_equals(set(self.l_topo.switches()), 
+                          set(self.node_map.keys()))
+        assert_set_equals(ports, set(self.port_map.keys()))
+        assert_is_injective(self.node_map)
+        assert_is_injective(self.port_map)
+        assert_policy_is_total(self.edge_policy, self.l_topo)
