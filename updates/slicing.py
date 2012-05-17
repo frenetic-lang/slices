@@ -102,6 +102,12 @@ def assert_policy_is_total(edge_policy, topo):
             assert (switch, port) in port_set, err % str((switch, port))
 
 def assert_set_equals(set1, set2):
+    """Asserts two sets are equal
+
+    ARGS:
+        set1: 1st set to check
+        set2: 2nd set to check
+    """
     err =  "expected <type 'set'>; got %s"
     assert type(set1) is set, err % str(type(set1))
     assert type(set2) is set, err % str(type(set2))
