@@ -33,10 +33,35 @@
 from abc import ABCMeta, abstractmethod
 import copy
 
+class Infix:
+    """Class to define infix operators like |so|."""
+    def __init__(self, function):
+        self.function = function
+    def __ror__(self, other):
+        return Infix(lambda x, self=self, other=other: self.function(other, x))
+    def __or__(self, other):
+        return self.function(other)
+    def __rlshift__(self, other):
+        return Infix(lambda x, self=self, other=other: self.function(other, x))
+    def __rshift__(self, other):
+        return self.function(other)
+    def __call__(self, value1, value2):
+        return self.function(value1, value2)
+
+class PhysicalException(Exception):
+    """Exceptions during logical-to-physical mapping."""
+    pass
+
 class Packet:
     """A fully-defined network packet, for testing purposes."""
     def __init__(self, fields):
         self.fields = fields
+
+    def __getitem__(self, key):
+        return self.fields[key]
+
+    def __eq__(self, other):
+        return self.fields == other.fields
 
 class Predicate:
     """Top-level abstract class for predicates."""
@@ -49,9 +74,8 @@ class Predicate:
         counterparts
 
         ARGS:
-        port_map: map from logical to physical ports
-        switch_map: map from logical to physical switches
-
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
+        switch_map: {l_switch: p_switch}
 
         RETURNS:
         a copy of this Predicate in which all logical
@@ -94,6 +118,9 @@ class Top(Predicate):
     def __repr__(self):
         return self.__str__()
 
+    def __eq__(self, other):
+        return isinstance(other, Top)
+
 class Bottom(Predicate):
     """The always-false predicate."""
     def __init__(self):
@@ -111,6 +138,9 @@ class Bottom(Predicate):
     def __repr__(self):
         return self.__str__()
 
+    def __eq__(self, other):
+        return isinstance(other, Bottom)
+
 
 HEADER_FIELDS = set (['loc', # See Header for special note about this value
                       'srcmac',
@@ -122,6 +152,13 @@ HEADER_FIELDS = set (['loc', # See Header for special note about this value
                       'protocol',
                       'srcport',
                       'dstport'])
+
+def inport(switch, ports):
+    """Construct a predicate accepting packets on one or a list of ports."""
+    if isinstance(ports, type([])):
+        return nary_union([Header('loc', (switch, p)) for p in ports])
+    else:
+        return Header('loc', (switch, ports))
 
 class Header(Predicate):
     """A predicate representing matching a header with a wildcard pattern.
@@ -149,15 +186,23 @@ class Header(Predicate):
     def __repr__(self):
         return self.__str__()
 
+    def __eq__(self, other):
+        return (isinstance(other, Header) and
+            self.field == other.field and
+            self.pattern == other.pattern)
+
     def get_physical_predicate(self, port_map, switch_map):
         """ Creates a copy of this Predicate in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: map from logical to physical ports
-        switch_map: map from logical to physical switches
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
+        switch_map: {l_switch: p_switch}
 
+        Note that the switch is mapped according to the switch map, not the
+        switch recorded in the port map.  If they are not the same, that is an
+        error, but this function does not check.
 
         RETURNS:
         a copy of this Predicate in which all logical
@@ -165,15 +210,23 @@ class Header(Predicate):
         counterparts
         """
         if self.field == 'loc':
-            assert(len(self.pattern) == 2)
-            switch = 0
-            if self.pattern[0] != 0:
-                switch = switch_map[self.pattern[0]]
-            port = 0
-            if self.pattern[1] != 0:
-                _, port = port_map[(self.pattern[0], self.pattern[1])]
-            return Header(self.field, (switch, port))
-        return Header(self.field, self.pattern)
+            l_switch, l_port = self.pattern
+            if l_switch == 0:
+                if not l_port == 0:
+                    raise PhysicalException(
+                        'cannot map a logical port on a wildcard switch')
+                else:
+                    return Header('loc', (0, 0))
+            else:
+                switch = switch_map[l_switch]
+                if l_port == 0:
+                    return Header('loc', (switch, 0))
+                else:
+                    _, port = port_map[(l_switch, l_port)]
+                    return Header('loc', (switch, port))
+        else:
+            # Matching on packet headers does not require mapping
+            return Header(self.field, self.pattern)
 
     def match(self, packet, (switch, port)):
         """Does this header match this located packet?"""
@@ -208,15 +261,21 @@ class Union(Predicate):
     def __repr__(self):
         return self.__str__()
 
+    def __eq__(self, other):
+        return self.left == other.left and self.right == other.right
+
     def get_physical_predicate(self, port_map, switch_map):
         """ Creates a copy of this Predicate in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: map from logical to physical ports
-        switch_map: map from logical to physical switches
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
+        switch_map: {l_switch: p_switch}
 
+        Note that switches are mapped according to the switch map, not the
+        switch recorded in the port map.  If they are not the same, that is an
+        error, but this function does not check.
 
         RETURNS:
         a copy of this Predicate in which all logical
@@ -229,26 +288,6 @@ class Union(Predicate):
 
     def match(self, packet, loc):
         return self.left.match(packet, loc) or self.right.match(packet, loc)
-
-def nary_union(predicates):
-    """Return a union of all predicates in predicates."""
-    if len(predicates) == 0:
-        return None
-    else:
-        base = predicates[0]
-        for predicate in predicates[1:]:
-            base = Union(predicate, base)
-        return base
-
-def nary_intersection(predicates):
-    """Return a intersection of all predicates in predicates."""
-    if len(predicates) == 0:
-        return None
-    else:
-        base = predicates[0]
-        for predicate in predicates[1:]:
-            base = Intersection(predicate, base)
-        return base
 
 class Intersection(Predicate):
     """A predicate representing the intersection of two predicates."""
@@ -269,15 +308,21 @@ class Intersection(Predicate):
     def __repr__(self):
         return self.__str__()
 
+    def __eq__(self, other):
+        return self.left == other.left and self.right == other.right
+
     def get_physical_predicate(self, port_map, switch_map):
         """ Creates a copy of this Predicate in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: map from logical to physical ports
-        switch_map: map from logical to physical switches
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
+        switch_map: {l_switch: p_switch}
 
+        Note that switches are mapped according to the switch map, not the
+        switch recorded in the port map.  If they are not the same, that is an
+        error, but this function does not check.
 
         RETURNS:
         a copy of this Predicate in which all logical
@@ -286,7 +331,7 @@ class Intersection(Predicate):
         """
         l_pred = self.left.get_physical_predicate(port_map, switch_map)
         r_pred = self.right.get_physical_predicate(port_map, switch_map)
-        return Union(l_pred, r_pred)
+        return Intersection(l_pred, r_pred)
 
     def match(self, packet, loc):
         return self.left.match(packet, loc) and self.right.match(packet, loc)
@@ -310,15 +355,21 @@ class Difference(Predicate):
     def __repr__(self):
         return self.__str__()
 
+    def __eq__(self, other):
+        return self.left == other.left and self.right == other.right
+
     def get_physical_predicate(self, port_map, switch_map):
         """ Creates a copy of this Predicate in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: map from logical to physical ports
-        switch_map: map from logical to physical switches
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
+        switch_map: {l_switch: p_switch}
 
+        Note that switches are mapped according to the switch map, not the
+        switch recorded in the port map.  If they are not the same, that is an
+        error, but this function does not check.
 
         RETURNS:
         a copy of this Predicate in which all logical
@@ -327,11 +378,31 @@ class Difference(Predicate):
         """
         l_pred = self.left.get_physical_predicate(port_map, switch_map)
         r_pred = self.right.get_physical_predicate(port_map, switch_map)
-        return Union(l_pred, r_pred)
+        return Difference(l_pred, r_pred)
 
     def match(self, packet, loc):
         return (self.left.match(packet, loc) and
                 not self.right.match(packet, loc))
+
+def nary_union(predicates):
+    """Return a union of all predicates in predicates."""
+    if len(predicates) == 0:
+        return None
+    else:
+        base = predicates[0]
+        for predicate in predicates[1:]:
+            base = Union(predicate, base)
+        return base
+
+def nary_intersection(predicates):
+    """Return a intersection of all predicates in predicates."""
+    if len(predicates) == 0:
+        return None
+    else:
+        base = predicates[0]
+        for predicate in predicates[1:]:
+            base = Intersection(predicate, base)
+        return base
 
 class Action:
     """Description of a forwarding action, with possible modification."""
@@ -340,9 +411,8 @@ class Action:
         ARGS:
             switch: switch on which the ports live
             ports: ports to which to forward packet
-            modify: dictionary of header fields to wildcarded strings, those
-                fields in the packet will be overwritten by non-wildcard bits in
-                the corresponding string.
+            modify: dictionary of header fields to values, fields that are set
+                will overwrite the packet's fields
         """
         assert(isinstance(ports, type([])))
         assert(isinstance(modify, type({})))
@@ -355,6 +425,11 @@ class Action:
 
     def __repr__(self):
         return self.__str__()
+
+    def __eq__(self, other):
+        return (self.switch == other.switch and
+            self.ports == other.ports and
+            self.modify == other.modify)
 
     def modify_packet(self, packet):
         """Modify packet with this action's modify pattern.
@@ -369,11 +444,12 @@ class Action:
         # TODO(astory): update wildcards correctly that are smaller than whole
         # fields
         new.fields.update(self.modify)
-        return (new, (self.switch, (self.switch, self.ports)))
+        return (new, (self.switch, self.ports))
 
     def get_physical_rep(self, port_map, switch_map):
         """Return this action mapped to a physical network."""
-        p_ports = [port_map[(self.switch, p)] for p in self.ports]
+        # Only return the port number, not the (switch, port) pair
+        p_ports = [port_map[(self.switch, p)][1] for p in self.ports]
         return Action(switch_map[self.switch], p_ports, self.modify)
 
 class Policy:
@@ -387,9 +463,12 @@ class Policy:
         counterparts
 
         ARGS:
-        port_map: map from logical to physical ports
-        switch_map: map from logical to physical switches
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
+        switch_map: {l_switch: p_switch}
 
+        Note that switches are mapped according to the switch map, not the
+        switch recorded in the port map.  If they are not the same, that is an
+        error, but this function does not check.
 
         RETURNS:
         a copy of this object in which all logical
@@ -426,6 +505,21 @@ class BottomPolicy(Policy):
     def __repr__(self):
         return self.__str__()
 
+    def __eq__(self, other):
+        return isinstance(other, BottomPolicy)
+
+def make_policy(predicate, action):
+    """Construct a policy with one or more actions.
+    
+    Auto-converts action to a list if it is a solitary action.  Otherwise, pass
+    whatever we got, and deal with the potential consequences.
+    """
+    if isinstance(action, Action):
+        return PrimitivePolicy(predicate, [action])
+    else:
+        return PrimitivePolicy(predicate, action)
+
+then = Infix(make_policy)
 
 class PrimitivePolicy(Policy):
     """Policy for mapping a single predicate to a list of actions."""
@@ -451,15 +545,22 @@ class PrimitivePolicy(Policy):
     def __repr__(self):
         return self.__str__()
 
+    def __eq__(self, other):
+        return self.predicate == other.predicate and \
+            self.actions == other.actions
+
     def get_physical_rep(self, port_map, switch_map):
         """ Creates a copy of this object in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: map from logical to physical ports
-        switch_map: map from logical to physical switches
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
+        switch_map: {l_switch: p_switch}
 
+        Note that switches are mapped according to the switch map, not the
+        switch recorded in the port map.  If they are not the same, that is an
+        error, but this function does not check.
 
         RETURNS:
         a copy of this object in which all logical
@@ -472,12 +573,10 @@ class PrimitivePolicy(Policy):
         return PrimitivePolicy(p_pred, p_act)
 
     def get_actions(self, packet, loc):
-        if self.predicate.matches(packet, loc):
-            returned_packets = []
-            for action in self.actions:
-                p = action.modify(packet)
-                returned_packets += [p for n in action.ports]
-            return returned_packets
+        if self.predicate.match(packet, loc):
+            return self.actions
+        else:
+            return []
 
 class PolicyUnion(Policy):
     """The union of two policies."""
@@ -504,9 +603,12 @@ class PolicyUnion(Policy):
         counterparts
 
         ARGS:
-        port_map: map from logical to physical ports
-        switch_map: map from logical to physical switches
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
+        switch_map: {l_switch: p_switch}
 
+        Note that switches are mapped according to the switch map, not the
+        switch recorded in the port map.  If they are not the same, that is an
+        error, but this function does not check.
 
         RETURNS:
         a copy of this object in which all logical
@@ -559,9 +661,12 @@ class PolicyRestriction(Policy):
         counterparts
 
         ARGS:
-        port_map: map from logical to physical ports
-        switch_map: map from logical to physical switches
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
+        switch_map: {l_switch: p_switch}
 
+        Note that switches are mapped according to the switch map, not the
+        switch recorded in the port map.  If they are not the same, that is an
+        error, but this function does not check.
 
         RETURNS:
         a copy of this object in which all logical
@@ -573,7 +678,7 @@ class PolicyRestriction(Policy):
         return PolicyRestriction(pol, pred)
 
     def get_actions(self, packet, loc):
-        if self.predicate.matches(packet):
+        if self.predicate.match(packet, loc):
             return self.policy.get_actions(packet, loc)
         else:
             return []
