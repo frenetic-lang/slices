@@ -404,6 +404,11 @@ def nary_intersection(predicates):
             base = Intersection(predicate, base)
         return base
 
+def forward(switch, ports):
+    if isinstance(ports, int):
+        ports = [ports]
+    return Action(switch, ports=ports)
+
 class Action:
     """Description of a forwarding action, with possible modification."""
     def __init__(self, switch, ports=[], modify=dict()):
