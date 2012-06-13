@@ -432,7 +432,8 @@ class Action:
         return self.__str__()
 
     def __eq__(self, other):
-        return (self.switch == other.switch and
+        return (isinstance(other, Action) and
+            self.switch == other.switch and
             self.ports == other.ports and
             self.modify == other.modify)
 
