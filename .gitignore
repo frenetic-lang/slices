@@ -2,3 +2,5 @@
 *~
 dist/*
 cabal-dev/*
+*.pyc
+*.sw[a-z]
