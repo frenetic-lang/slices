@@ -134,11 +134,11 @@ class Slice:
             physical_topology: NXTopo this slice will run on top of
             node_map: mapping from nodes in the logical topology to nodes in
                 the physical topology, must be injective
-            port_map: mapping from (switch,port) in the logical topology to (switch,port) in the
-                physical topology, must be injective
-            edge_policy: dictionary of {(switch, port) : predicate} pairs, only packets
-                entering the edge port that satisfy the predicate will be allowed to
-                pass
+            port_map: mapping from (switch,port) in the logical topology to
+                (switch,port) in the physical topology, must be injective
+            edge_policy: dictionary of {(switch, port) : predicate} pairs,
+                only packets entering the edge port that satisfy the predicate
+                will be allowed to pass
 
         Note that because we need to have the ports in both topologies be
         defined, only finalized NXTopo objects will work for creating a slice.
@@ -165,12 +165,6 @@ class Slice:
         for switch in self.l_topo.switches():
             for port in self.l_topo.node[switch]['ports'].values():
                 ports.add((switch, port))
-                      
-        #  assert(self.l_topo.switches() == self.node_map.keys())
-        #  assert(ports == set(self.port_map.keys()))
-        #  assert(is_injective(self.node_map))
-        #  assert(is_injective(self.port_map))
-        #  assert(policy_is_total(self.edge_policy, self.l_topo))
 
         assert_set_equals(set(self.l_topo.switches()), 
                           set(self.node_map.keys()))
