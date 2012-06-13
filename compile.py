@@ -90,12 +90,12 @@ def transform(slices):
         # Produce a separate policy that adds vlan tags to safe incoming packets
         inport_policy = external_to_vlan_policy(slic, policy, vlan)
         # Take their union
-        safe_inport_policy = nc.PolicyUnion(safe_policy, inport_policy)
+        safe_inport_policy = safe_policy + inport_policy
 
         # Modify the result to strip the vlan tag from outbound ports
         # Note that this should be the last step.  If our policy takes an
-        # incoming packet and forwards it directly out, we should still remove
-        # its vlan tag.
+        # incoming packet and forwards it directly out, we should not add a vlan
+        # tag.
         full_policy = internal_strip_vlan_policy(slic, safe_inport_policy)
 
         policy_list.append(
@@ -114,7 +114,7 @@ def isolated_policy(policy, vlan):
         a new policy object that is slic's policy but restricted to its vlan.
     """
     vlan_predicate = nc.Header('vlan', vlan)
-    return nc.PolicyRestriction(policy, vlan_predicate)
+    return policy % vlan_predicate
 
 def external_predicate((switch, port), predicate):
     """Produce a predicate that matches predicate incoming on (switch, port).
@@ -126,7 +126,7 @@ def external_predicate((switch, port), predicate):
     RETURNS:
         Predicate object matching predicate on switch and port.
     """
-    return nc.Intersection(nc.on_port(switch, port), predicate)
+    return nc.inport(switch, port) & predicate
 
 def modify_vlan(policy, vlan):
     """Re-write all actions of policy to set vlan to vlan."""
@@ -148,35 +148,27 @@ def strip_vlan(policy, (switch, port)):
     """Re-write all actions of policy to set vlan to 0 on switch, port."""
     assert(isinstance(policy, netcore.Policy))
     if isinstance(policy, nc.PrimitivePolicy):
+        # get a new copy of all the actions so we can safely modify them
         actions = copy.deepcopy(policy.actions)
-        lastAction = None
+        output_actions = []
         for action in actions:
-            # Skip over new actions we just inserted
-            if action == lastAction:
-                continue
-            lastAction = action
+            if action.switch == switch and port in action.ports:
+                # Split ports into ports we need to change and ports we don't
+                bad_ports = [port]
+                good_ports = action.ports
+                good_ports.remove(port)
 
-            # A switch may forward multiple packets out the same port.
-            portMatches = [p for p in action.ports if p == port]
-
-            if action.switch == switch and action.ports == portMatches:
-                # If this policy does nothing but forward out the
-                # egress port, then just update the vlan.
-                action.modify['vlan'] = 0
-            elif action.switch == switch and port in action.ports:
-                # Otherwise:
-                # 1) Remove port from action.ports,
-                # 2) Copy this action, then set ports = [port] and VLAN = 0 
-                #    in the copy.
-                # 3) Insert the copy immediately after the current action.
-                while port in action.ports:
-                    action.ports.remove(port)
-                newAction = copy.copy(action)
-                newAction.ports = portMatches
-                newAction.modify['vlan'] = 0
-                actions.insert(actions.index(action) + 1, newAction)
-                lastAction = newAction
-        return nc.PrimitivePolicy(policy.predicate, actions)
+                # Build new actions around these objects
+                out_modify = dict(action.modify)
+                out_modify['vlan'] = 0
+                out_a = nc.Action(switch, bad_ports, out_modify)
+                output_actions.append(out_a)
+                if len(good_ports) > 0:
+                    output_actions.append(action)
+            else:
+                # No need to modify it
+                output_actions.append(action)
+        return nc.PrimitivePolicy(policy.predicate, output_actions)
     elif isinstance(policy, nc.PolicyUnion):
         left = strip_vlan(policy.left, (switch, port))
         right = strip_vlan(policy.right, (switch, port))
@@ -220,6 +212,10 @@ def internal_strip_vlan_policy(slic, policy):
             if loc in slic.edge_ports:
                 [act.set_vlan(0) for act in acts]
             return acts
+
+    but must take care to split actions that forward to multiple ports into
+    smaller actions where necessary so that the vlan stripping is only done as
+    appropriate.
     """
     for ((switch, port), _) in slic.edge_policy.iteritems():
         policy = strip_vlan(policy, (switch, port))

@@ -237,10 +237,6 @@ class Header(Predicate):
             p = self.pattern
             return p == 0 or p == packet[self.field]
 
-def on_port(switch, port):
-    """Return a predicate matching packets on switch and port."""
-    return Header('loc', (switch, port))
-
 # Compound predicates
 class Union(Predicate):
     """A predicate representing the union of two predicates."""

@@ -32,6 +32,7 @@ import compile as cp
 import copy
 import netcore as nc
 from netcore import Action, inport, Header, then
+import slicing
 import unittest
 
 a1 = Action(1, [1, 2, 3], {'srcmac':1})
@@ -67,6 +68,7 @@ def action_to_microactions(action):
     return [Action(switch, [p], copy.copy(modify)) for p in action.ports]
 
 def flatten(l):
+    """An opaque way to flatten a list."""
     return [item for sublist in l for item in sublist]
 
 class TestCompile(unittest.TestCase):
@@ -87,9 +89,9 @@ class TestCompile(unittest.TestCase):
 
         modified_micro = flatten([action_to_microactions(a)
                                   for a in actions_of_policy(modified)])
-        print "\n".join([str(x) for x in micro])
-        print ""
-        print "\n".join([str(x) for x in modified_micro])
+#       print "\n".join([str(x) for x in micro])
+#       print ""
+#       print "\n".join([str(x) for x in modified_micro])
 
         self.assertItemsEqual(micro, modified_micro)
 
