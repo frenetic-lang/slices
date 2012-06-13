@@ -65,6 +65,15 @@ class Predicate:
         """Does this header match this located packet?"""
         pass
 
+    def __add__(self, other):
+        return Union(self, other)
+
+    def __and__(self, other):
+        return Intersection(self, other)
+
+    def __sub__(self, other):
+        return Difference(self, other)
+
 # Primitive predicates
 
 # Should these just be one class that holds a boolean?
@@ -72,6 +81,9 @@ class Top(Predicate):
     """The always-true predicate."""
     def get_physical_predicate(self, port_map, switch_map):
         return Top()
+
+    def match(self, packet, (switch, port)):
+        return True
 
     def __str__(self):
         return "Top"
@@ -83,10 +95,13 @@ class Bottom(Predicate):
     """The always-false predicate."""
     def get_physical_predicate(self, port_map, switch_map):
         return Bottom()
+
     def match(self, packet, (switch, port)):
         return False
+
     def __str__(self):
         return "Bottom"
+
     def __repr__(self):
         return self.__str__()
 
@@ -185,7 +200,7 @@ class Union(Predicate):
         return "Union\n%s\n%s" % (self.left, self.right)
 
     def __repr__(self):
-        self.__str__()
+        return self.__str__()
 
     def get_physical_predicate(self, port_map, switch_map):
         """ Creates a copy of this Predicate in which all logical
@@ -381,6 +396,12 @@ class Policy:
     def get_actions(self, packet, loc):
         """Get set of (pkt, loc) this policy generates for a located packet."""
         pass
+
+    def __add__(self, other):
+        return PolicyUnion(self, other)
+
+    def __mod__(self, predicate):
+        return PolicyRestriction(self, predicate)
 
 class BottomPolicy(Policy):
     """Policy that drops everything."""
