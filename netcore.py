@@ -79,6 +79,9 @@ class Predicate:
 # Should these just be one class that holds a boolean?
 class Top(Predicate):
     """The always-true predicate."""
+    def __init__(self):
+        pass
+
     def get_physical_predicate(self, port_map, switch_map):
         return Top()
 
@@ -93,6 +96,9 @@ class Top(Predicate):
 
 class Bottom(Predicate):
     """The always-false predicate."""
+    def __init__(self):
+        pass
+
     def get_physical_predicate(self, port_map, switch_map):
         return Bottom()
 
@@ -165,7 +171,7 @@ class Header(Predicate):
                 switch = switch_map[self.pattern[0]]
             port = 0
             if self.pattern[1] != 0:
-                _,port = port_map[(self.pattern[0], self.pattern[1])]
+                _, port = port_map[(self.pattern[0], self.pattern[1])]
             return Header(self.field, (switch, port))
         return Header(self.field, self.pattern)
 
@@ -405,12 +411,18 @@ class Policy:
 
 class BottomPolicy(Policy):
     """Policy that drops everything."""
+    def __init__(self):
+        pass
+
     def get_physical_rep(self, port_map, switch_map):
         return self
+
     def get_actions(self, packet, loc):
         return []
+
     def __str__(self):
         return "BottomPolicy"
+
     def __repr__(self):
         return self.__str__()
 
@@ -455,7 +467,8 @@ class PrimitivePolicy(Policy):
         counterparts
         """
         p_pred = self.predicate.get_physical_predicate(port_map, switch_map)
-        p_act = [action.get_physical_rep(port_map, switch_map) for action in self.actions]
+        p_act = [action.get_physical_rep(port_map, switch_map)
+                 for action in self.actions]
         return PrimitivePolicy(p_pred, p_act)
 
     def get_actions(self, packet, loc):
