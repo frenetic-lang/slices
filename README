@@ -36,3 +36,9 @@ A rough (and perhaps incorrect guide)
 5. Repeat 1-5 up to 255 times
 6. Put all the slices you have into a list, and hand them to compile.transform.
 7. Check your results
+
+Numberjack
+-----------
+Numberjack is a constraint solving library we use to minimize the number of
+VLANs needed for compilation.  It can be downloaded from
+http://numberjack.ucc.ie/
