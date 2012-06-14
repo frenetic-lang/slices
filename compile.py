@@ -143,7 +143,6 @@ def modify_vlan(policy, vlan):
         new_policy = modify_vlan(policy.policy, vlan)
         return nc.PolicyRestriction(new_policy, policy.predicate)
 
-#TODO: fix bug where all egress ports from switch get set, not just the one.
 def strip_vlan(policy, (switch, port)):
     """Re-write all actions of policy to set vlan to 0 on switch, port."""
     assert(isinstance(policy, netcore.Policy))
