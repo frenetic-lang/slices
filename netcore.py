@@ -68,14 +68,14 @@ class Predicate:
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def get_physical_predicate(self, port_map, switch_map):
+    def get_physical_predicate(self, switch_map, port_map):
         """ Creates a copy of this Predicate in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: {(l_switch, l_port): (p_switch, p_port)}
         switch_map: {l_switch: p_switch}
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
 
         RETURNS:
         a copy of this Predicate in which all logical
@@ -106,7 +106,7 @@ class Top(Predicate):
     def __init__(self):
         pass
 
-    def get_physical_predicate(self, port_map, switch_map):
+    def get_physical_predicate(self, switch_map, port_map):
         return Top()
 
     def match(self, packet, (switch, port)):
@@ -126,7 +126,7 @@ class Bottom(Predicate):
     def __init__(self):
         pass
 
-    def get_physical_predicate(self, port_map, switch_map):
+    def get_physical_predicate(self, switch_map, port_map):
         return Bottom()
 
     def match(self, packet, (switch, port)):
@@ -191,14 +191,14 @@ class Header(Predicate):
             self.field == other.field and
             self.pattern == other.pattern)
 
-    def get_physical_predicate(self, port_map, switch_map):
+    def get_physical_predicate(self, switch_map, port_map):
         """ Creates a copy of this Predicate in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: {(l_switch, l_port): (p_switch, p_port)}
         switch_map: {l_switch: p_switch}
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
 
         Note that the switch is mapped according to the switch map, not the
         switch recorded in the port map.  If they are not the same, that is an
@@ -260,14 +260,14 @@ class Union(Predicate):
     def __eq__(self, other):
         return self.left == other.left and self.right == other.right
 
-    def get_physical_predicate(self, port_map, switch_map):
+    def get_physical_predicate(self, switch_map, port_map):
         """ Creates a copy of this Predicate in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: {(l_switch, l_port): (p_switch, p_port)}
         switch_map: {l_switch: p_switch}
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
 
         Note that switches are mapped according to the switch map, not the
         switch recorded in the port map.  If they are not the same, that is an
@@ -278,8 +278,8 @@ class Union(Predicate):
         ports and switches have been mapped to their physical
         counterparts
         """
-        l_pred = self.left.get_physical_predicate(port_map, switch_map)
-        r_pred = self.right.get_physical_predicate(port_map, switch_map)
+        l_pred = self.left.get_physical_predicate(switch_map, port_map)
+        r_pred = self.right.get_physical_predicate(switch_map, port_map)
         return Union(l_pred, r_pred)
 
     def match(self, packet, loc):
@@ -307,14 +307,14 @@ class Intersection(Predicate):
     def __eq__(self, other):
         return self.left == other.left and self.right == other.right
 
-    def get_physical_predicate(self, port_map, switch_map):
+    def get_physical_predicate(self, switch_map, port_map):
         """ Creates a copy of this Predicate in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: {(l_switch, l_port): (p_switch, p_port)}
         switch_map: {l_switch: p_switch}
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
 
         Note that switches are mapped according to the switch map, not the
         switch recorded in the port map.  If they are not the same, that is an
@@ -325,8 +325,8 @@ class Intersection(Predicate):
         ports and switches have been mapped to their physical
         counterparts
         """
-        l_pred = self.left.get_physical_predicate(port_map, switch_map)
-        r_pred = self.right.get_physical_predicate(port_map, switch_map)
+        l_pred = self.left.get_physical_predicate(switch_map, port_map)
+        r_pred = self.right.get_physical_predicate(switch_map, port_map)
         return Intersection(l_pred, r_pred)
 
     def match(self, packet, loc):
@@ -354,14 +354,14 @@ class Difference(Predicate):
     def __eq__(self, other):
         return self.left == other.left and self.right == other.right
 
-    def get_physical_predicate(self, port_map, switch_map):
+    def get_physical_predicate(self, switch_map, port_map):
         """ Creates a copy of this Predicate in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: {(l_switch, l_port): (p_switch, p_port)}
         switch_map: {l_switch: p_switch}
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
 
         Note that switches are mapped according to the switch map, not the
         switch recorded in the port map.  If they are not the same, that is an
@@ -372,8 +372,8 @@ class Difference(Predicate):
         ports and switches have been mapped to their physical
         counterparts
         """
-        l_pred = self.left.get_physical_predicate(port_map, switch_map)
-        r_pred = self.right.get_physical_predicate(port_map, switch_map)
+        l_pred = self.left.get_physical_predicate(switch_map, port_map)
+        r_pred = self.right.get_physical_predicate(switch_map, port_map)
         return Difference(l_pred, r_pred)
 
     def match(self, packet, loc):
@@ -448,7 +448,7 @@ class Action:
         new.fields.update(self.modify)
         return (new, (self.switch, self.ports))
 
-    def get_physical_rep(self, port_map, switch_map):
+    def get_physical_rep(self, switch_map, port_map):
         """Return this action mapped to a physical network."""
         # Only return the port number, not the (switch, port) pair
         p_ports = [port_map[(self.switch, p)][1] for p in self.ports]
@@ -459,14 +459,14 @@ class Policy:
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def get_physical_rep(self, port_map, switch_map):
+    def get_physical_rep(self, switch_map, port_map):
         """ Creates a copy of this object in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: {(l_switch, l_port): (p_switch, p_port)}
         switch_map: {l_switch: p_switch}
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
 
         Note that switches are mapped according to the switch map, not the
         switch recorded in the port map.  If they are not the same, that is an
@@ -495,7 +495,7 @@ class BottomPolicy(Policy):
     def __init__(self):
         pass
 
-    def get_physical_rep(self, port_map, switch_map):
+    def get_physical_rep(self, switch_map, port_map):
         return self
 
     def get_actions(self, packet, loc):
@@ -551,14 +551,14 @@ class PrimitivePolicy(Policy):
         return self.predicate == other.predicate and \
             self.actions == other.actions
 
-    def get_physical_rep(self, port_map, switch_map):
+    def get_physical_rep(self, switch_map, port_map):
         """ Creates a copy of this object in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: {(l_switch, l_port): (p_switch, p_port)}
         switch_map: {l_switch: p_switch}
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
 
         Note that switches are mapped according to the switch map, not the
         switch recorded in the port map.  If they are not the same, that is an
@@ -569,8 +569,8 @@ class PrimitivePolicy(Policy):
         ports and switches have been mapped to their physical
         counterparts
         """
-        p_pred = self.predicate.get_physical_predicate(port_map, switch_map)
-        p_act = [action.get_physical_rep(port_map, switch_map)
+        p_pred = self.predicate.get_physical_predicate(switch_map, port_map)
+        p_act = [action.get_physical_rep(switch_map, port_map)
                  for action in self.actions]
         return PrimitivePolicy(p_pred, p_act)
 
@@ -599,14 +599,14 @@ class PolicyUnion(Policy):
     def __repr__(self):
         return self.__str__()
 
-    def get_physical_rep(self, port_map, switch_map):
+    def get_physical_rep(self, switch_map, port_map):
         """ Creates a copy of this object in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: {(l_switch, l_port): (p_switch, p_port)}
         switch_map: {l_switch: p_switch}
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
 
         Note that switches are mapped according to the switch map, not the
         switch recorded in the port map.  If they are not the same, that is an
@@ -617,8 +617,8 @@ class PolicyUnion(Policy):
         ports and switches have been mapped to their physical
         counterparts
         """
-        l_pol = self.left.get_physical_rep(port_map, switch_map)
-        r_pol = self.right.get_physical_rep(port_map, switch_map)
+        l_pol = self.left.get_physical_rep(switch_map, port_map)
+        r_pol = self.right.get_physical_rep(switch_map, port_map)
         return PolicyUnion(l_pol, r_pol)
 
     def get_actions(self, packet, loc):
@@ -657,14 +657,14 @@ class PolicyRestriction(Policy):
     def __repr__(self):
         return self.__str__()
 
-    def get_physical_rep(self, port_map, switch_map):
+    def get_physical_rep(self, switch_map, port_map):
         """ Creates a copy of this object in which all logical
         ports and switches have been mapped to their physical
         counterparts
 
         ARGS:
-        port_map: {(l_switch, l_port): (p_switch, p_port)}
         switch_map: {l_switch: p_switch}
+        port_map: {(l_switch, l_port): (p_switch, p_port)}
 
         Note that switches are mapped according to the switch map, not the
         switch recorded in the port map.  If they are not the same, that is an
@@ -675,8 +675,8 @@ class PolicyRestriction(Policy):
         ports and switches have been mapped to their physical
         counterparts
         """
-        pol = self.policy.get_physical_rep(port_map, switch_map)
-        pred = self.predicate.get_physical_predicate(port_map, switch_map)
+        pol = self.policy.get_physical_rep(switch_map, port_map)
+        pred = self.predicate.get_physical_predicate(switch_map, port_map)
         return PolicyRestriction(pol, pred)
 
     def get_actions(self, packet, loc):
