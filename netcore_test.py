@@ -85,19 +85,19 @@ class TestPredicate(unittest.TestCase):
         port_map = {(1,2):(5,10)}
         switch_map = {1:5}
         loc = nc.inport(1, 2)
-        phys = loc.get_physical_predicate(port_map, switch_map)
+        phys = loc.get_physical_predicate(switch_map, port_map)
         self.assertEquals((5, 10), phys.pattern)
 
         loc = nc.inport(1, 0)
-        phys = loc.get_physical_predicate(port_map, switch_map)
+        phys = loc.get_physical_predicate(switch_map, port_map)
         self.assertEquals((5, 0), phys.pattern)
 
         loc = nc.inport(0, 2)
         self.assertRaises(nc.PhysicalException,
-            loc.get_physical_predicate, port_map, switch_map)
+            loc.get_physical_predicate, switch_map, port_map)
 
         fields = nc.Header('srcmac', 3)
-        phys = fields.get_physical_predicate(port_map, switch_map)
+        phys = fields.get_physical_predicate(switch_map, port_map)
         self.assertEquals(fields, phys)
 
     def test_union_match(self):
@@ -180,7 +180,7 @@ class TestAction(unittest.TestCase):
         action = nc.Action(1, ports=[2,3])
         expected = nc.Action(100, ports=[200, 300])
 
-        phys = action.get_physical_rep(port_map, switch_map)
+        phys = action.get_physical_rep(switch_map, port_map)
 
         self.assertEqual(expected, phys)
 
@@ -197,7 +197,7 @@ class TestPolicy(unittest.TestCase):
         policy = pred |then| action
         expected_policy = expected_pred |then| expected_action
 
-        phys_policy = policy.get_physical_rep(port_map, switch_map)
+        phys_policy = policy.get_physical_rep(switch_map, port_map)
         self.assertEqual(expected_policy, phys_policy)
 
     def test_prim_actions(self):
