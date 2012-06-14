@@ -63,7 +63,6 @@ physical counterparts as provided by the slice's mapping.
 import copy
 import netcore as nc
 import slicing
-import netcore
 
 class VlanException(Exception):
     """Exception to represent failure to map to VLAN tags."""
@@ -145,7 +144,7 @@ def modify_vlan(policy, vlan):
 
 def strip_vlan(policy, (switch, port)):
     """Re-write all actions of policy to set vlan to 0 on switch, port."""
-    assert(isinstance(policy, netcore.Policy))
+    assert(isinstance(policy, nc.Policy))
     if isinstance(policy, nc.PrimitivePolicy):
         # get a new copy of all the actions so we can safely modify them
         actions = copy.deepcopy(policy.actions)
@@ -195,7 +194,7 @@ def external_to_vlan_policy(slic, policy, vlan):
         but only if they satisfy the slice's isolation predicates.
     """
     assert(isinstance(slic, slicing.Slice))
-    assert(isinstance(policy, netcore.Policy))
+    assert(isinstance(policy, nc.Policy))
     external_predicates = [external_predicate(loc, pred)
                            for loc, pred in slic.edge_policy.iteritems()]
     predicate = nc.nary_union(external_predicates)
