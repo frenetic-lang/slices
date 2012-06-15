@@ -65,5 +65,8 @@ def assign_vlans(slices, conflicts):
     constraints.append(nj.Minimise(sum(count_vars)))
     m = nj.Model(constraints)
     solver = MiniSat.Solver(m)
-    solver.solve()
-    return dict([(k, v.get_value()) for k, v in vlans.items()])
+    if solver.solve():
+        return dict([(k, v.get_value()) for k, v in vlans.items()])
+    else:
+        return None
+

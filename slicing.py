@@ -130,7 +130,7 @@ class Slice:
 
         ARGS:
             logical_topology: NXTopo object representing the logical topology
-                that this slice uses
+                that this slice uses.  It should INCLUDE the end hosts.
             physical_topology: NXTopo this slice will run on top of
             node_map: mapping from nodes in the logical topology to nodes in
                 the physical topology, must be injective
@@ -166,7 +166,7 @@ class Slice:
             for port in self.l_topo.node[switch]['ports'].values():
                 ports.add((switch, port))
 
-        assert_set_equals(set(self.l_topo.switches()), 
+        assert_set_equals(set(self.l_topo.nodes()), 
                           set(self.node_map.keys()))
         assert_set_equals(ports, set(self.port_map.keys()))
         assert_is_injective(self.node_map)

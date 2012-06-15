@@ -29,14 +29,11 @@
 # Tests for compile.py, which implements the slice compiler                    #
 ################################################################################
 import compile as cp
-import examples.amaz as az
 import copy
 import netcore as nc
 from netcore import Action, inport, Header, then
 import slicing
 import unittest
-
-topo, slices = az.get_slices()
 
 a1 = Action(1, [1, 2, 3], {'srcmac':1})
 a2 = Action(2, [2, 3], {'dstmac':2})
@@ -73,75 +70,6 @@ def action_to_microactions(action):
 def flatten(l):
     """An opaque way to flatten a list."""
     return [item for sublist in l for item in sublist]
-
-class TestVlanAssignment(unittest.TestCase):
-    def test_basic(self):
-        slices = range(0,10)
-        assigned = cp.sequential(slices)
-        # Verify via pigeonhole principle - if there are as many slices as
-        # vlans, no vlan is used with two slices
-        self.assertEqual(len(slices), len(set(assigned.keys())))
-
-    def test_get_links_internal(self):
-        links = cp.links(topo, 1)
-        switches = [(s1, s2) for (s1, p1), (s2, p2) in links]
-
-        # Verify all the expected switch links
-        self.assertItemsEqual([(1,3), (1,4), (1,5)], switches)
-        # Verify that all the port labels are what they are in the topology
-        for ((s1, p1), (s2, p2)) in links:
-            self.assertEqual((s2, p2), topo.node[s1]['port'][p1])
-
-    def test_get_links_external(self):
-        links = cp.links(topo, 3)
-        switches = [(s1, s2) for (s1, p1), (s2, p2) in links]
-
-        # Verify all the expected switch links
-        self.assertItemsEqual([(3,1), (3,2)], switches)
-        # Verify that all the port labels are what they are in the topology
-        for ((s1, p1), (s2, p2)) in links:
-            self.assertEqual((s2, p2), topo.node[s1]['port'][p1])
-
-    def test_edges_of_topo(self):
-        edges = cp.edges_of_topo(topo)
-
-        # Verify all the expected switch links
-        switches = [(s1, s2) for (s1, p1), (s2, p2) in edges]
-        self.assertItemsEqual([(1, 3), (1, 4), (1, 5),
-                               (2, 3), (2, 4), (2, 5),
-                               (3, 1), (3, 2),
-                               (4, 1), (4, 2),
-                               (5, 1), (5, 2)],
-                              switches)
-        # Verify that all the port labels are what they are in the topology
-        for ((s1, p1), (s2, p2)) in edges:
-            self.assertEqual((s2, p2), topo.node[s1]['port'][p1])
-
-    def test_map_edges(self):
-        s = slices[0]
-        l_edges = cp.edges_of_topo(s.l_topo)
-        p_edges = cp.edges_of_topo(topo)
-        mapped = cp.map_edges(l_edges, s.node_map, s.port_map)
-        switches = [(s1, s2) for (s1, p1), (s2, p2) in mapped]
-
-        # Verify all the expected switch links
-        self.assertItemsEqual([(1, 3), (1, 4), (3, 1), (4, 1)], switches)
-        # Verify that all the port labels are what they are in the topology
-        for ((s1, p1), (s2, p2)) in mapped:
-            self.assertEqual((s2, p2), topo.node[s1]['port'][p1])
-
-    def test_share_edge(self):
-        self.assertTrue( cp.share_edge(slices[0], slices[1]))
-        self.assertFalse(cp.share_edge(slices[0], slices[2]))
-        self.assertFalse(cp.share_edge(slices[1], slices[2]))
-
-    def test_optimal(self):
-        colors = cp.slice_optimal(slices)
-
-        # Only 0 and 1 share an edge, so they should be different colors
-        self.assertNotEqual(colors[slices[0]], colors[slices[1]])
-        # 2 is disconnected, so this is 2-colorable
-        self.assertEqual(2, len(set(colors.values())))
 
 class TestCompile(unittest.TestCase):
     def test_modify_vlan(self):
