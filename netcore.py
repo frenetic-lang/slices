@@ -386,9 +386,7 @@ def nary_union(predicates):
         return None
     else:
         base = predicates[0]
-        for predicate in predicates[1:]:
-            base = Union(predicate, base)
-        return base
+        return sum(predicates[1:], base)
 
 def nary_intersection(predicates):
     """Return a intersection of all predicates in predicates."""
@@ -632,9 +630,7 @@ def nary_policy_union(policies):
         return None
     else:
         base = policies[0]
-        for policy in policies[1:]:
-            base = PolicyUnion(policy, base)
-        return base
+        return sum(policies[1:], base)
 
 # Maybe we can provide this with just a function that transforms the policy?
 # -astory
