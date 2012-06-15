@@ -32,7 +32,20 @@ from mininet.topo import Topo, Node
 import networkx as nx
 
 class NXTopo(nx.Graph):
-    
+    """Representation of network switches.
+
+    PARTIAL (and reverse-engineered) documentation:
+
+    Adds a base field, finalized to track whether mininet has been called
+    (assigns ports).
+
+    Adds three fields to the node dictionary:
+
+    isSwitch:  boolean, distinguishes switches from end hosts
+    port: {local_port: (destination_switch, destination_port)}
+    ports: {destination_switch: local_port}
+    """
+
     def __init__(self):
         super(NXTopo, self).__init__()
         self.finalized=False
@@ -74,9 +87,10 @@ class NXTopo(nx.Graph):
 
     # This differs from the normal NX.Graph subgraph() in that we need
     # to be very careful in what node attributes we propagate
-    # over. For the moment, I propagate all of them. 
+    # over. For the moment, I propagate all of them except for trimming
+    # no-longer-in-use ports out of the switches' dictionaries
     def subgraph(self, nbunch):
-        """Return the subgraph induced on switches in nbunch.
+        """Return the subgraph induced on switches and hosts in nbunch.
 
         The induced subgraph of the graph contains the nodes in nbunch
         and the edges between those nodes.
@@ -91,13 +105,26 @@ class NXTopo(nx.Graph):
         G : NXTopo
             A subgraph of the graph with the same edge attributes.
         """
-        nbunch = list(nbunch) + self.hosts()        
         bunch =self.nbunch_iter(nbunch)
         # create new graph and copy subgraph into it
         H = NXTopo()
         # copy node and attribute dictionaries
         for n in bunch:
             H.node[n]=self.node[n]
+        # We need to remove inappropriate ports from the switches
+        for n in bunch:
+            new_port = {}
+            for local_port, (switch, port) in n['port'].items():
+                if switch in bunch:
+                    new_port[local_port] = (switch, port)
+                # Otherwise, don't copy it over
+            n['port'] = new_port
+            new_ports = {}
+            for switch, local_port in n['ports'].items():
+                if switch in bunch:
+                    new_ports[switch] = local_port
+                # Otherwise, don't copy it over
+            n['ports'] = new_ports
         # namespace shortcuts for speed
         H_adj=H.adj
         self_adj=self.adj
@@ -146,7 +173,6 @@ class NXTopo(nx.Graph):
     def nx_graph(self):
         assert self.finalized
         return self.copy()
-
 
     def mininet_topo(self):
         assert self.finalized
