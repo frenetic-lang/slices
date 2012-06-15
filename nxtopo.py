@@ -29,6 +29,7 @@
 ################################################################################
 
 from mininet.topo import Topo, Node
+import copy
 import networkx as nx
 
 class NXTopo(nx.Graph):
@@ -110,18 +111,18 @@ class NXTopo(nx.Graph):
         H = NXTopo()
         # copy node and attribute dictionaries
         for n in bunch:
-            H.node[n]=self.node[n]
+            H.node[n]=copy.deepcopy(self.node[n])
         # We need to remove inappropriate ports from the switches
-        for n in bunch:
+        for n in H.node.values():
             new_port = {}
             for local_port, (switch, port) in n['port'].items():
-                if switch in bunch:
+                if switch in nbunch:
                     new_port[local_port] = (switch, port)
                 # Otherwise, don't copy it over
             n['port'] = new_port
             new_ports = {}
             for switch, local_port in n['ports'].items():
-                if switch in bunch:
+                if switch in nbunch:
                     new_ports[switch] = local_port
                 # Otherwise, don't copy it over
             n['ports'] = new_ports
