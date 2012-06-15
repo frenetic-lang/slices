@@ -28,14 +28,15 @@
 # /updates/Slice.py                                                            #
 # Tests for Slice, the data structure to represent virtual network slices      #
 ################################################################################
+
 import slicing
 import unittest
 import nxtopo
 import netcore
-import mil_ex
-import day_ex
-import amaz_ex
-import simple_ex
+import examples.mil as mil
+import examples.day as day
+import examples.amaz as amaz
+import examples.simple as simple
 
 class TestSlice(unittest.TestCase):
     def test_is_injective(self):
@@ -160,10 +161,10 @@ class TestSlice(unittest.TestCase):
         
     def test_examples(self):
         # Maintains examples
-        self.assertEquals(3, len(mil_ex.get_slices()))
-        self.assertEquals(3, len(amaz_ex.get_slices()[1]))
-        self.assertEquals(1, len(simple_ex.get_slices()))
-        self.assertEquals(3, len(day_ex.get_slices()))
+        self.assertEquals(3, len(mil.get_slices()))
+        self.assertEquals(3, len(amaz.get_slices()[1]))
+        self.assertEquals(1, len(simple.get_slices()))
+        self.assertEquals(3, len(day.get_slices()))
 
 def total_policy_topo():
     topo = nxtopo.NXTopo()

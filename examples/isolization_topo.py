@@ -29,7 +29,7 @@
 # $Id$ #
 ################################################################################
 
-from fattree_topo import FattreeTopology
+from updates.examples.fattree_topo import FattreeTopology
 Topology = FattreeTopology
 
 #import hub_topo

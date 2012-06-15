@@ -1,3 +1,4 @@
+#!/usr/bin/python
 ################################################################################
 # The Frenetic Project                                                         #
 # frenetic@frenetic-lang.org                                                   #
@@ -31,7 +32,7 @@ import sys
 import logging
 
 import networkx as nx
-import verification
+from updates import verification
 from experiment_base import *
 import string
 
@@ -45,7 +46,7 @@ import compile
 
 from routing_policies import shortest_path_policy
 
-import amaz_ex
+import amaz
 
 class FakeNX(object):
     def __init__(self, switch_list):
@@ -133,7 +134,7 @@ def slice_sp(slice):
 
 def test_4():
     logger.debug('Getting slices.')
-    topo, slices = amaz_ex.get_slices()
+    topo, slices = amaz.get_slices()
     logger.debug('Compiling slices.')
     netcorePolicy = compile.transform([(s, slice_sp(s)) for s in slices])
     #logger.debug('NetCore policy:\n%s\n' % netcorePolicy)

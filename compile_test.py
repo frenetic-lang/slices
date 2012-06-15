@@ -29,7 +29,7 @@
 # Tests for compile.py, which implements the slice compiler                    #
 ################################################################################
 import compile as cp
-import amaz_ex as az
+import examples.amaz as az
 import copy
 import netcore as nc
 from netcore import Action, inport, Header, then
