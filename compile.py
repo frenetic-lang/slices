@@ -62,6 +62,7 @@ physical counterparts as provided by the slice's mapping.
 
 import copy
 import netcore as nc
+from netcore import then
 import slicing
 import netcore
 
@@ -69,22 +70,78 @@ class VlanException(Exception):
     """Exception to represent failure to map to VLAN tags."""
     pass
 
-def transform(slices):
+def sequential(slices):
+    """Assign vlans to slices assuming they all overlap, sequentially."""
+    if len(slices) > 255:
+        raise VlanException('Too many slices')
+    vlan = 1
+    d = {}
+    for s in slices:
+        d[s] = vlan
+        vlan += 1
+    return d
+
+def links(topo, sid):
+    """Get a list of ((s,p), (s,p)) for all outgoing links from this switch."""
+    switch = topo.node[sid]
+    return [((sid, our_port), (them, their_port))
+            for our_port, (them, their_port) in switch['port'].items()
+            # If their_port == 0, they're an end host, not a switch.
+            # We don't care about end hosts.
+            if their_port != 0]
+
+def edges_of_topo(topo):
+    """Get all switch-switch edges in a topo, in links format."""
+    # Need to dereference switch id to get full object
+    ls = []
+    for switch in topo.switches():
+        ls.extend(links(topo, switch))
+    return ls
+
+def map_edges(links, switch_map, port_map):
+    """Map ((s, p), (s, p)) edges according to the two maps."""
+    mapped = []
+    for (s1, p1), (s2, p2) in links:
+        # only include the port result from the port map, don't rely on the
+        # switch recorded there
+        mapped.append(((switch_map[s1], port_map[(s1, p1)][1]),
+                       (switch_map[s2], port_map[(s2, p2)][1])))
+    return mapped
+
+def share_edge(s1, s2):
+    """Determine whether two slices share a physical edge."""
+    # This is only correct if we have a guarantee that the topologies are sane,
+    # and only give us real internal edges.
+    s1_ls = set(map_edges(edges_of_topo(s1.l_topo), s1.node_map, s1.port_map))
+    s2_ls = set(map_edges(edges_of_topo(s2.l_topo), s2.node_map, s2.port_map))
+    return not s1_ls.isdisjoint(s2_ls)
+
+def slice_optimal(slices):
+    # Import here because optimize has hard-to-install dependencies
+    import optimize
+    conflicts = []
+    for i in range(0, len(slices)):
+        for j in range(i+1, len(slices)):
+            if share_edge(slices[i], slices[j]):
+                conflicts.append((slices[i], slices[j]))
+    return optimize.assign_vlans(slices, conflicts)
+
+def transform(slices, assigner=sequential):
     """Turn a set of slices sharing a physical topology into a single policy.
     ARGS:
         slices:  set of (slices, policies) (with the same physical topology) to
             combine
+        assigner:  function to use to assign vlans to slices.  Must return a
+            {slice: vlan} dictionary, defaults to sequential.
 
     RETURNS:
         a single Policy encapsulating the shared but isolated behavior of all
         the slices
     """
-    if len(slices) > 255:
-        raise VlanException('Too many slices')
-    # vlans = zip(slices, range(1, len(slices) + 1))
+    vlans = assigner(slices)
     policy_list = []
-    vlan = 1
-    for (slic, policy) in slices:
+    for slic in slices:
+        vlan = vlans[slic]
         # Produce a policy that only accepts packets within our vlan
         safe_policy = isolated_policy(policy, vlan)
         # Produce a separate policy that adds vlan tags to safe incoming packets
@@ -100,7 +157,6 @@ def transform(slices):
 
         policy_list.append(
             full_policy.get_physical_rep(slic.port_map, slic.node_map))
-        vlan += 1
     return nc.nary_policy_union(policy_list)
 
 def isolated_policy(policy, vlan):
@@ -138,10 +194,10 @@ def modify_vlan(policy, vlan):
     elif isinstance(policy, nc.PolicyUnion):
         left = modify_vlan(policy.left, vlan)
         right = modify_vlan(policy.right, vlan)
-        return nc.PolicyUnion(left, right)
+        return left + right
     else: # isinstance(policy, nc.PolicyRestriction)
         new_policy = modify_vlan(policy.policy, vlan)
-        return nc.PolicyRestriction(new_policy, policy.predicate)
+        return new_policy % policy.predicate
 
 def strip_vlan(policy, (switch, port)):
     """Re-write all actions of policy to set vlan to 0 on switch, port."""
@@ -167,14 +223,14 @@ def strip_vlan(policy, (switch, port)):
             else:
                 # No need to modify it
                 output_actions.append(action)
-        return nc.PrimitivePolicy(policy.predicate, output_actions)
+        return policy.predicate |then| output_actions
     elif isinstance(policy, nc.PolicyUnion):
         left = strip_vlan(policy.left, (switch, port))
         right = strip_vlan(policy.right, (switch, port))
-        return nc.PolicyUnion(left, right)
+        return left + right
     elif isinstance(policy, nc.PolicyRestriction):
         new_policy = strip_vlan(policy.policy, (switch, port))
-        return nc.PolicyRestriction(new_policy, policy.predicate)
+        return new_policy % policy.predicate
     else:
         raise Exception("Unexpected policy: %s\n" % policy)
 
