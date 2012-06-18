@@ -383,7 +383,7 @@ class Difference(Predicate):
 def nary_union(predicates):
     """Return a union of all predicates in predicates."""
     if len(predicates) == 0:
-        return None
+        return Bottom()
     else:
         base = predicates[0]
         return sum(predicates[1:], base)
@@ -391,7 +391,7 @@ def nary_union(predicates):
 def nary_intersection(predicates):
     """Return a intersection of all predicates in predicates."""
     if len(predicates) == 0:
-        return None
+        return Bottom()
     else:
         base = predicates[0]
         for predicate in predicates[1:]:
@@ -631,7 +631,7 @@ class PolicyUnion(Policy):
 def nary_policy_union(policies):
     """Take the union of many policies."""
     if len(policies) == 0:
-        return None
+        return BottomPolicy()
     else:
         base = policies[0]
         return sum(policies[1:], base)
