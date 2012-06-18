@@ -64,9 +64,9 @@ import copy
 import netcore as nc
 from netcore import then
 import slicing
-import vlan
+import vlan as vl
 
-def transform(slices, assigner=vlan.sequential):
+def transform(slices, assigner=vl.sequential):
     """Turn a set of slices sharing a physical topology into a single policy.
     ARGS:
         slices:  set of (slices, policies) (with the same physical topology) to
@@ -80,7 +80,7 @@ def transform(slices, assigner=vlan.sequential):
     """
     vlans = assigner(slices)
     policy_list = []
-    for slic in slices:
+    for slic, policy in slices:
         vlan = vlans[slic]
         # Produce a policy that only accepts packets within our vlan
         safe_policy = isolated_policy(policy, vlan)

@@ -28,6 +28,7 @@
 # /slices/optimize.py                                                          #
 # VLAN reduction optimizations                                                 #
 ################################################################################
+"""Tools to calculate the minimium assignment of vlans to slices."""
 
 import Numberjack as nj
 import MiniSat
@@ -63,8 +64,8 @@ def assign_vlans(slices, conflicts):
         for var in vlan_vars:
             count_vars.append(var != i)
     constraints.append(nj.Minimise(sum(count_vars)))
-    m = nj.Model(constraints)
-    solver = MiniSat.Solver(m)
+    model = nj.Model(constraints)
+    solver = MiniSat.Solver(model)
     if solver.solve():
         return dict([(k, v.get_value()) for k, v in vlans.items()])
     else:

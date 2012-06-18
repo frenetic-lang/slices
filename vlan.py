@@ -28,6 +28,7 @@
 # /slices/vlan.py                                                              #
 # Tools to assign vlan tags to network slices                                  #
 ################################################################################
+"""Tools to assign vlan tags to network slices."""
 
 class VlanException(Exception):
     """Exception to represent failure to map to VLAN tags."""
@@ -38,11 +39,11 @@ def sequential(slices):
     if len(slices) > 255:
         raise VlanException('More than 255 slices, cannot naively assign vlans')
     vlan = 1
-    d = {}
-    for s in slices:
-        d[s] = vlan
+    output = {}
+    for slic in slices:
+        output[slic] = vlan
         vlan += 1
-    return d
+    return output
 
 def links(topo, sid):
     """Get a list of ((s,p), (s,p)) for all outgoing links from this switch."""
@@ -56,22 +57,22 @@ def links(topo, sid):
 def edges_of_topo(topo, undirected=False):
     """Get all switch-switch edges in a topo, in links format."""
     # Need to dereference switch id to get full object
-    ls = []
+    lnks = []
     for switch in topo.switches():
-        ls.extend(links(topo, switch))
+        lnks.extend(links(topo, switch))
     if undirected:
-        ls_new = []
-        for (source, sink) in ls:
-            if (sink, source) not in ls_new:
-                ls_new.append((source, sink))
-        return ls_new
+        lnks_new = []
+        for (source, sink) in lnks:
+            if (sink, source) not in lnks_new:
+                lnks_new.append((source, sink))
+        return lnks_new
     else:
-        return ls
+        return lnks
 
-def map_edges(links, switch_map, port_map):
+def map_edges(lnks, switch_map, port_map):
     """Map ((s, p), (s, p)) edges according to the two maps."""
     mapped = []
-    for (s1, p1), (s2, p2) in links:
+    for (s1, p1), (s2, p2) in lnks:
         # only include the port result from the port map, don't rely on the
         # switch recorded there
         mapped.append(((switch_map[s1], port_map[(s1, p1)][1]),
@@ -96,6 +97,7 @@ def share_edge(s1, s2):
     return not s1_ls.isdisjoint(s2_ls)
 
 def slice_optimal(slices):
+    """Return the minimum per-slice vlan assignment."""
     # Import here because optimize has hard-to-install dependencies
     import optimize
     conflicts = []
@@ -110,14 +112,15 @@ def slice_optimal(slices):
         raise VlanException('Could not assign vlan tags - too many slices')
 
 def edge_optimal(topo, slices):
+    """Return the minimum per-slice-per-edge vlan assignment."""
     edges = edges_of_topo(topo, undirected=True)
     edge_slices = {}
-    for e in edges:
-        edge_slices[e] = set()
-        for s in slices:
-            if edge_in(e, s):
-                edge_slices[e].add(s)
+    for edge in edges:
+        edge_slices[edge] = set()
+        for slic in slices:
+            if edge_in(edge, slic):
+                edge_slices[edge].add(slic)
     edge_vlans = {}
-    for (e, ss) in edge_slices.items():
-        edge_vlans[e] = dict(zip(ss, range(1, len(ss) + 1)))
+    for (edge, slics) in edge_slices.items():
+        edge_vlans[edge] = dict(zip(slics, range(1, len(slics) + 1)))
     return edge_vlans

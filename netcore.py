@@ -399,6 +399,10 @@ def nary_intersection(predicates):
         return base
 
 def forward(switch, ports):
+    """Construct an action to forward out ports on switch.
+
+    ports may be a port number or a list of port numbers.
+    """
     if isinstance(ports, int):
         ports = [ports]
     return Action(switch, ports=ports)
