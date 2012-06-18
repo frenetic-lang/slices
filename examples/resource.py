@@ -67,10 +67,11 @@ def get_slices():
                       p_topo.node[server_hub]['ports'][server_host])
             p_map[key] = vlu
 
-            edge_policies[key] =  nc.Header('destmac', mac)
+            edge_policies[key] =  nc.Header('dstmac', mac)
 
         slices.append(slicing.Slice(l_topo, p_topo, s_map,
-                                    p_map, edge_policies))
+                                    p_map, edge_policies,
+                                    map_end_hosts=True))
 
     return slices
 

@@ -125,7 +125,7 @@ def assert_set_equals(set1, set2):
 class Slice:
     """Data structure to represent virtual network slices."""
     def __init__(self, logical_topology, physical_topology, node_map, port_map,
-                 edge_policy):
+                 edge_policy, map_end_hosts=False):
         """Create a Slice.
 
         ARGS:
@@ -139,6 +139,8 @@ class Slice:
             edge_policy: dictionary of {(switch, port) : predicate} pairs,
                 only packets entering the edge port that satisfy the predicate
                 will be allowed to pass
+            map_end_hosts: whether end hosts are mapped in the node_map or not,
+                only affects validation
 
         Note that because we need to have the ports in both topologies be
         defined, only finalized NXTopo objects will work for creating a slice.
@@ -148,6 +150,7 @@ class Slice:
         self.node_map = node_map
         self.port_map = port_map
         self.edge_policy = edge_policy
+        self.map_end_hosts = map_end_hosts
         self.validate()
 
     def validate(self):
@@ -162,11 +165,15 @@ class Slice:
         """
 
         ports = set()
-        for switch in self.l_topo.switches():
+        if self.map_end_hosts:
+            switches = set(self.l_topo.switches())
+        else:
+            switches = set(self.l_topo.nodes())
+        for switch in switches:
             for port in self.l_topo.node[switch]['ports'].values():
                 ports.add((switch, port))
 
-        assert_set_equals(set(self.l_topo.nodes()), 
+        assert_set_equals(switches, 
                           set(self.node_map.keys()))
         assert_set_equals(ports, set(self.port_map.keys()))
         assert_is_injective(self.node_map)
