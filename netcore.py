@@ -143,7 +143,8 @@ class Bottom(Predicate):
         return isinstance(other, Bottom)
 
 
-HEADER_FIELDS = set (['loc', # See Header for special note about this value
+HEADER_FIELDS = set (['switch',
+                      'port',
                       'srcmac',
                       'dstmac',
                       'ethtype',
@@ -157,25 +158,9 @@ HEADER_FIELDS = set (['loc', # See Header for special note about this value
 def inport(switch, ports):
     """Construct a predicate accepting packets on one or a list of ports."""
     if isinstance(ports, type([])):
-        return nary_union([Header({'loc': (switch, p)}) for p in ports])
+        return nary_union([Header({'switch': switch, 'port': p}) for p in ports])
     else:
-        return Header({'loc': (switch, ports)})
-
-def intersect_values(v1, v2):
-    """Return the intersection or None.
-
-    Properly intersects values with 0 as wildcard, or returns None if their
-    intersection is empty.  Follows the same rules laid out in intersect_headers
-    """
-    if v1 == 0:
-        # This also works for the 0, 0 case
-        return v2
-    elif v2 == 0:
-        return v1
-    elif v1 == v2:
-        return v1
-    else:
-        return None
+        return Header({'switch': switch, 'port': ports})
 
 def intersect_headers(h1, h2):
     """Return the intersection of two headers.
@@ -185,7 +170,6 @@ def intersect_headers(h1, h2):
 
     * If a field is only present in one header or the other, just take it from
       that one.
-    * If a field is present in both, but is zero in one, take it from the other
     * If a field is present in both, and the same, copy it over
     * If a field is present in both, and different, return Bottom since no
       packet can match both headers, so the intersection of the two headers is
@@ -197,26 +181,15 @@ def intersect_headers(h1, h2):
 
     f1 = copy.copy(h1.fields)
     f2 = h2.fields
-    for f, p in f2.items():
+    for f, p2 in f2.items():
         if f in f1:
-            if f == 'loc':
-                s1, p1 = f1[f]
-                s2, p2 = p
-                s_int = intersect_values(s1, s2)
-                p_int = intersect_values(p1, p2)
-                if s_int is None or p_int is None:
-                    return Bottom()
-                else:
-                    f1[f] = (s_int, p_int)
-
-            else: # f != 'loc', just a single value
-                v = intersect_values(f1[f], p)
-                if v is None:
-                    return Bottom()
-                else:
-                    f1[f] = v
-        else: # f not in f1
-            f1[f] = p
+            p1 = f1[f]
+            if p1 != p2:
+                return Bottom()
+            else: # they're equal, the value is already in f1
+                pass
+        else: # f not in f1, copy it over
+            f1[f] = p2
     return Header(f1)
 
 class Header(Predicate):
@@ -230,21 +203,12 @@ class Header(Predicate):
         ARGS:
             fields: {field: pattern}
             field: header field to match pattern against
-            pattern: (possibly) wildcarded bitstring, except in the case of loc,
-                where it's (switch, port), where both are ints, with 0
-                representing a wildcard.
-
-            Unset fields are the same as fields set to 0.  They are
-            automatically removed by the constructor.
+            pattern: value to match.
         """
         self.fields = {}
         for f in fields:
             assert(f in HEADER_FIELDS)
-            if f == 'loc':
-                assert(len(fields[f]) == 2)
-            if fields[f] != 0:
-                # If it's 0, it's a wildcard, so leave it out
-                self.fields[f] = fields[f]
+        self.fields = fields
 
     def __str__(self):
         return "Header: %s" % str(self.fields)
@@ -272,21 +236,19 @@ class Header(Predicate):
         """
         out_fields = {}
         for f, p in self.fields.items():
-            if f == 'loc':
-                l_switch, l_port = p
-                if l_switch == 0:
-                    if not l_port == 0:
-                        raise PhysicalException(
-                            'cannot map a logical port on a wildcard switch')
-                    else:
-                        out_fields['loc'] = (0, 0)
+            if f == 'switch':
+                out_fields[f] = switch_map[p]
+            elif f == 'port':
+                if not 'switch' in self.fields:
+                    raise PhysicalException(
+                        'cannot map a logical port on a wildcard switch')
                 else:
-                    switch = switch_map[l_switch]
-                    if l_port == 0:
-                        out_fields[f] = (switch, 0)
+                    # discard the switch
+                    if p == 0:
+                        # This is an end host, they don't get their ports mapped
+                        out_fields[f] = p
                     else:
-                        _, port = port_map[(l_switch, l_port)]
-                        out_fields[f] = (switch, port)
+                        _, out_fields[f] = port_map[(self.fields['switch'], p)]
             else:
                 # Matching on packet headers does not require mapping
                 out_fields[f] = p
@@ -295,9 +257,11 @@ class Header(Predicate):
     def match(self, packet, (switch, port)):
         """Does this header match this located packet?"""
         for f, pat in self.fields.items():
-            if f == 'loc':
-                (s, p) = pat
-                if not ((s == 0 or s == switch) and (p == 0 or p == port)):
+            if f == 'switch':
+                if pat != switch:
+                    return False
+            elif f == 'port':
+                if pat != port:
                     return False
             else:
                 p = pat
@@ -510,8 +474,7 @@ class Difference(Predicate):
             total_match = True
             for f in r_right.fields:
                 # don't deal with locations, they're too messy for now
-                if (f != 'loc' and
-                        f in r_left.fields and
+                if (f in r_left.fields and
                         r_right.fields[f] != r_left.fields[f]):
                     # If left only matches packets with f:x, and right only
                     # matches packets with f:y, then right does not restrict
@@ -519,8 +482,7 @@ class Difference(Predicate):
                     # this makes right _entirely_ useless, so there's no point
                     # in checking the rest.
                     return r_left
-                elif (f != 'loc' and
-                        f in r_left.fields and
+                elif (f in r_left.fields and
                         r_left.fields[f] == r_right.fields[f]):
                     pass
                 else:
@@ -627,8 +589,6 @@ class Action:
             packet modified by this action's modify pattern
         """
         new = copy.deepcopy(packet)
-        # TODO(astory): update wildcards correctly that are smaller than whole
-        # fields
         new.fields.update(self.modify)
         return (new, (self.switch, self.ports))
 

@@ -30,7 +30,7 @@
 ################################################################################
 import copy
 import netcore as nc
-from netcore import then
+from netcore import inport, then
 import unittest
 
 blank_packet = nc.Packet({})
@@ -58,32 +58,23 @@ class TestPredicate(unittest.TestCase):
         self.assertTrue(nc.Top().match(blank_packet, (1, 1)))
         self.assertFalse(nc.Bottom().match(blank_packet, (1, 1)))
 
-    def test_intersect_value(self):
-        pairs = [(0, 0, 0),
-                 (1, 1, 0),
-                 (1, 1, 1),
-                 (None, 1, 2),
-                ]
-        for expected, v1, v2 in pairs:
-            self.assertEqual(expected, nc.intersect_values(v1, v2))
-            self.assertEqual(expected, nc.intersect_values(v2, v1))
-
     def test_intersect_headers(self):
         hd = nc.Header
         bot = nc.Bottom()
-        pairs = [(bot, exact_header, nega_header),
+        pairs = [
+                 (bot, exact_header, nega_header),
                  (bot, exact_header, hd({'srcmac': -1})),
-                 (exact_header, exact_header, zero_header),
+                 (bot, exact_header, zero_header),
                  (exact_header, exact_header, empty_header),
-                 (bot, hd({'loc':(0, 1)}), hd({'loc':(0, 2)})),
-                 (bot, hd({'loc':(1, 1)}), hd({'loc':(2, 2)})),
-                 (bot, hd({'loc':(1, 0)}), hd({'loc':(2, 0)})),
-                 (hd({'loc':(0, 0)}), hd({'loc':(0, 0)}), hd({'loc':(0, 0)})),
-                 (hd({'loc':(1, 0)}), hd({'loc':(1, 0)}), hd({'loc':(0, 0)})),
-                 (hd({'loc':(1, 0)}), hd({'loc':(1, 0)}), hd({'loc':(1, 0)})),
-                 (hd({'loc':(0, 1)}), hd({'loc':(0, 1)}), hd({'loc':(0, 0)})),
-                 (hd({'loc':(0, 1)}), hd({'loc':(0, 1)}), hd({'loc':(0, 1)})),
-                 (hd({'loc':(1, 1)}), hd({'loc':(1, 0)}), hd({'loc':(0, 1)})),
+                 (bot, hd({'port': 1}), hd({'port': 2})),
+                 (bot, inport(1,1), inport(2,2)),
+                 (bot, hd({'switch': 1}), hd({'switch':2})),
+                 (hd({}), hd({}), hd({})),
+                 (hd({'switch': 1}), hd({'switch': 1}), hd({})),
+                 (hd({'switch': 1}), hd({'switch': 1}), hd({'switch': 1})),
+                 (hd({'port': 1}), hd({'port': 1}), hd({})),
+                 (hd({'port': 1}), hd({'port': 1}), hd({'port': 1})),
+                 (inport(1, 1), hd({'switch': 1}), hd({'port': 1})),
                 ]
         for expected, h1, h2 in pairs:
             self.assertEqual(expected, nc.intersect_headers(h1, h2))
@@ -98,21 +89,17 @@ class TestPredicate(unittest.TestCase):
         self.assertFalse(header.match(blank_packet, (switch, port+1)))
         self.assertFalse(header.match(blank_packet, (switch+1, port+1)))
 
-        switch_only = nc.inport(switch, 0)
+        switch_only = nc.Header({'switch': switch})
         self.assertTrue(switch_only.match(blank_packet, (switch, 3234)))
         self.assertFalse(switch_only.match(blank_packet, (switch+1, 3234)))
 
-        port_only = nc.inport(0, port)
+        port_only = nc.Header({'port': port})
         self.assertTrue(port_only.match(blank_packet, (2345, port)))
         self.assertFalse(port_only.match(blank_packet, (2345, port+1)))
 
     def test_header_other_match(self):
         for (field, value) in fields.items():
             self.assertTrue(nc.Header({field: value}).match(full_packet, (1, 2)))
-
-    def test_header_other_match_wild(self):
-        for (field, value) in fields.items():
-            self.assertTrue(nc.Header({field: 0}).match(full_packet, (1, 2)))
 
     def test_header_other_mismatch(self):
         for (field, value) in fields.items():
@@ -124,13 +111,15 @@ class TestPredicate(unittest.TestCase):
         switch_map = {1:5}
         loc = nc.inport(1, 2)
         phys = loc.get_physical_predicate(switch_map, port_map)
-        self.assertEquals((5, 10), phys.fields['loc'])
+        self.assertEquals(5, phys.fields['switch'])
+        self.assertEquals(10, phys.fields['port'])
 
-        loc = nc.inport(1, 0)
+        loc = nc.Header({'switch': 1})
         phys = loc.get_physical_predicate(switch_map, port_map)
-        self.assertEquals((5, 0), phys.fields['loc'])
+        self.assertEquals(5, phys.fields['switch'])
+        self.assertNotIn('port', phys.fields)
 
-        loc = nc.inport(0, 2)
+        loc = nc.Header({'port': 2})
         self.assertRaises(nc.PhysicalException,
             loc.get_physical_predicate, switch_map, port_map)
 
