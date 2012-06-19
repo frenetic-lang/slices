@@ -89,6 +89,13 @@ class Predicate:
         """Does this header match this located packet?"""
         pass
 
+    def __repr__(self):
+        return self.__str__()
+
+    def reduce(self):
+        """Return copy with removed redundencies."""
+        return copy.deepcopy(self)
+
     def __add__(self, other):
         return Union(self, other)
 
@@ -115,9 +122,6 @@ class Top(Predicate):
     def __str__(self):
         return "Top"
 
-    def __repr__(self):
-        return self.__str__()
-
     def __eq__(self, other):
         return isinstance(other, Top)
 
@@ -134,9 +138,6 @@ class Bottom(Predicate):
 
     def __str__(self):
         return "Bottom"
-
-    def __repr__(self):
-        return self.__str__()
 
     def __eq__(self, other):
         return isinstance(other, Bottom)
@@ -182,9 +183,6 @@ class Header(Predicate):
 
     def __str__(self):
         return "%s : %s" % (self.field, self.pattern)
-
-    def __repr__(self):
-        return self.__str__()
 
     def __eq__(self, other):
         return (isinstance(other, Header) and
@@ -252,13 +250,26 @@ class Union(Predicate):
         self.right = right
 
     def __str__(self):
-        return "Union\n%s\n%s" % (self.left, self.right)
-
-    def __repr__(self):
-        return self.__str__()
+        left_s = str(self.left)
+        right_s = str(self.right)
+        left_lines  = ['|' + s for s in left_s.split('\n')]
+        right_lines = ['|' + s for s in right_s.split('\n')]
+        return "\n".join(["Union"] + left_lines + right_lines)
 
     def __eq__(self, other):
         return self.left == other.left and self.right == other.right
+
+    def reduce(self):
+        r_left = self.left.reduce()
+        r_right = self.right.reduce()
+        if isinstance(r_left, Top) or isinstance(r_right, Top):
+            return Top()
+        elif isinstance(r_left, Bottom):
+            return r_right
+        elif isinstance(r_right, Bottom):
+            return r_left
+        else:
+            return r_left + r_right
 
     def get_physical_predicate(self, switch_map, port_map):
         """ Creates a copy of this Predicate in which all logical
@@ -299,13 +310,29 @@ class Intersection(Predicate):
         self.right = right
 
     def __str__(self):
-        return "Intersection\n%s\n%s" % (self.left, self.right)
+        left_s = str(self.left)
+        right_s = str(self.right)
+        left_lines  = ['|' + s for s in left_s.split('\n')]
+        right_lines = ['|' + s for s in right_s.split('\n')]
+        return "\n".join(["Intersection"] + left_lines + right_lines)
 
     def __repr__(self):
         return self.__str__()
 
     def __eq__(self, other):
         return self.left == other.left and self.right == other.right
+
+    def reduce(self):
+        r_left = self.left.reduce()
+        r_right = self.right.reduce()
+        if isinstance(r_left, Bottom) or isinstance(r_right, Bottom):
+            return Bottom()
+        elif isinstance(r_left, Top):
+            return r_right
+        elif isinstance(r_right, Top):
+            return r_left
+        else:
+            return r_left & r_right
 
     def get_physical_predicate(self, switch_map, port_map):
         """ Creates a copy of this Predicate in which all logical
@@ -346,13 +373,27 @@ class Difference(Predicate):
         self.right = right
 
     def __str__(self):
-        return "Difference\n%s\n%s" % (self.left, self.right)
+        left_s = str(self.left)
+        right_s = str(self.right)
+        left_lines  = ['|' + s for s in left_s.split('\n')]
+        right_lines = ['|' + s for s in right_s.split('\n')]
+        return "\n".join(["Difference"] + left_lines + right_lines)
 
     def __repr__(self):
         return self.__str__()
 
     def __eq__(self, other):
         return self.left == other.left and self.right == other.right
+
+    def reduce(self):
+        r_left = self.left.reduce()
+        r_right = self.right.reduce()
+        if isinstance(r_left, Bottom) or isinstance(r_right, Top):
+            return Bottom()
+        elif isinstance(r_right, Top):
+            return r_left
+        else:
+            return r_left - r_right
 
     def get_physical_predicate(self, switch_map, port_map):
         """ Creates a copy of this Predicate in which all logical
@@ -424,7 +465,7 @@ class Action:
         self.modify = modify
 
     def __str__(self):
-        return "%s: %s %s" % (self.switch, self.modify, self.ports)
+        return "%s: %s -> %s" % (self.switch, self.modify, self.ports)
 
     def __repr__(self):
         return self.__str__()
@@ -480,11 +521,18 @@ class Policy:
         counterparts
         """
         pass
+    
+    def __repr__(self):
+        return self.__str__()
 
     @abstractmethod
     def get_actions(self, packet, loc):
         """Get set of (pkt, loc) this policy generates for a located packet."""
         pass
+
+    def reduce(self):
+        """Return copy with removed redundencies."""
+        return copy.deepcopy(self)
 
     def __add__(self, other):
         return PolicyUnion(self, other)
@@ -505,9 +553,6 @@ class BottomPolicy(Policy):
 
     def __str__(self):
         return "BottomPolicy"
-
-    def __repr__(self):
-        return self.__str__()
 
     def __eq__(self, other):
         return isinstance(other, BottomPolicy)
@@ -544,14 +589,15 @@ class PrimitivePolicy(Policy):
         self.actions = actions
 
     def __str__(self):
-        return "PrimitivePolicy\n%s\n%s" % (self.predicate, self.actions)
-
-    def __repr__(self):
-        return self.__str__()
+        return "PrimitivePolicy\n|%s\n|%s" % (self.predicate, self.actions)
 
     def __eq__(self, other):
         return self.predicate == other.predicate and \
             self.actions == other.actions
+
+    def reduce(self):
+        r_pred = self.predicate.reduce()
+        return r_pred |then| self.actions
 
     def get_physical_rep(self, switch_map, port_map):
         """ Creates a copy of this object in which all logical
@@ -596,10 +642,21 @@ class PolicyUnion(Policy):
         self.right = right
 
     def __str__(self):
-        return "PolicyUnion\n%s\n%s" % (self.left, self.right)
+        left_s = str(self.left)
+        right_s = str(self.right)
+        left_lines  = ['|' + s for s in left_s.split('\n')]
+        right_lines = ['|' + s for s in right_s.split('\n')]
+        return "\n".join(["PolicyUnion"] + left_lines + right_lines)
 
-    def __repr__(self):
-        return self.__str__()
+    def reduce(self):
+        r_left = self.left.reduce()
+        r_right = self.right.reduce()
+        if isinstance(r_left, BottomPolicy):
+            return r_right
+        elif isinstance(r_right, BottomPolicy):
+            return r_left
+        else:
+            return r_right + r_left
 
     def get_physical_rep(self, switch_map, port_map):
         """ Creates a copy of this object in which all logical
@@ -652,10 +709,16 @@ class PolicyRestriction(Policy):
         self.predicate = predicate
 
     def __str__(self):
-        return "PolicyRestriction\n%s\n%s" % (self.predicate, self.policy)
+        left_s = str(self.policy)
+        right_s = str(self.predicate)
+        left_lines  = ['|' + s for s in left_s.split('\n')]
+        right_lines = ['|' + s for s in right_s.split('\n')]
+        return "\n".join(["PolicyRestriction"] + left_lines + right_lines)
 
-    def __repr__(self):
-        return self.__str__()
+    def reduce(self):
+        r_pol = self.policy.reduce()
+        r_pred = self.predicate.reduce()
+        return r_pol % r_pred
 
     def get_physical_rep(self, switch_map, port_map):
         """ Creates a copy of this object in which all logical
