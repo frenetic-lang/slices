@@ -112,7 +112,12 @@ def slice_optimal(slices):
         raise VlanException('Could not assign vlan tags - too many slices')
 
 def edge_optimal(topo, slices):
-    """Return the minimum per-slice-per-edge vlan assignment."""
+    """Return the minimum per-slice-per-edge vlan assignment.
+    
+    RETURNS: {edge: {slice: tag}}.  Note that while this is inconvenient to work
+        with from slices, it's much more convenient to generate.  If you want
+        {slice: {edge: tag}}, there's a converter in edge_compile.py
+    """
     edges = edges_of_topo(topo, undirected=True)
     edge_slices = {}
     for edge in edges:
