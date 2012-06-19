@@ -42,14 +42,52 @@ fields_neg = {'srcmac': -1, 'dstmac': -2, 'ethtype': -3,
           'srcport': -8, 'dstport': -9}
 full_packet = nc.Packet(fields)
 nega_packet = nc.Packet(fields_neg)
-exact_header = nc.nary_intersection([nc.Header(f, v)
-                                     for f, v in fields.items()])
+empty_header = nc.Header({})
+zero_header = nc.Header(dict(zip(fields.keys(), [0] * len(fields))))
+exact_header = nc.Header(fields)
+nega_header = nc.Header(fields_neg)
 
+reduceable = nc.Header({'srcmac': 1}) & nc.Header({'dstmac': 2})
+red_target = nc.Header({'srcmac': 1, 'dstmac': 2})
+reduceable2 = nc.Header({'srcip': 1}) & nc.Header({'dstip': 2})
+red_target2 = nc.Header({'srcip': 1, 'dstip': 2})
+                                     
 class TestPredicate(unittest.TestCase):
 #   Basic tests for primitives make sure that the remaining tests are sane
     def test_boolean_predicates(self):
         self.assertTrue(nc.Top().match(blank_packet, (1, 1)))
         self.assertFalse(nc.Bottom().match(blank_packet, (1, 1)))
+
+    def test_intersect_value(self):
+        pairs = [(0, 0, 0),
+                 (1, 1, 0),
+                 (1, 1, 1),
+                 (None, 1, 2),
+                ]
+        for expected, v1, v2 in pairs:
+            self.assertEqual(expected, nc.intersect_values(v1, v2))
+            self.assertEqual(expected, nc.intersect_values(v2, v1))
+
+    def test_intersect_headers(self):
+        hd = nc.Header
+        bot = nc.Bottom()
+        pairs = [(bot, exact_header, nega_header),
+                 (bot, exact_header, hd({'srcmac': -1})),
+                 (exact_header, exact_header, zero_header),
+                 (exact_header, exact_header, empty_header),
+                 (bot, hd({'loc':(0, 1)}), hd({'loc':(0, 2)})),
+                 (bot, hd({'loc':(1, 1)}), hd({'loc':(2, 2)})),
+                 (bot, hd({'loc':(1, 0)}), hd({'loc':(2, 0)})),
+                 (hd({'loc':(0, 0)}), hd({'loc':(0, 0)}), hd({'loc':(0, 0)})),
+                 (hd({'loc':(1, 0)}), hd({'loc':(1, 0)}), hd({'loc':(0, 0)})),
+                 (hd({'loc':(1, 0)}), hd({'loc':(1, 0)}), hd({'loc':(1, 0)})),
+                 (hd({'loc':(0, 1)}), hd({'loc':(0, 1)}), hd({'loc':(0, 0)})),
+                 (hd({'loc':(0, 1)}), hd({'loc':(0, 1)}), hd({'loc':(0, 1)})),
+                 (hd({'loc':(1, 1)}), hd({'loc':(1, 0)}), hd({'loc':(0, 1)})),
+                ]
+        for expected, h1, h2 in pairs:
+            self.assertEqual(expected, nc.intersect_headers(h1, h2))
+            self.assertEqual(expected, nc.intersect_headers(h2, h1))
 
     def test_header_loc(self):
         switch = 3
@@ -70,39 +108,39 @@ class TestPredicate(unittest.TestCase):
 
     def test_header_other_match(self):
         for (field, value) in fields.items():
-            self.assertTrue(nc.Header(field, value).match(full_packet, (1, 2)))
+            self.assertTrue(nc.Header({field: value}).match(full_packet, (1, 2)))
 
     def test_header_other_match_wild(self):
         for (field, value) in fields.items():
-            self.assertTrue(nc.Header(field, 0).match(full_packet, (1, 2)))
+            self.assertTrue(nc.Header({field: 0}).match(full_packet, (1, 2)))
 
     def test_header_other_mismatch(self):
         for (field, value) in fields.items():
             self.assertFalse(
-                nc.Header(field, value+1).match(full_packet, (1, 2)))
+                nc.Header({field: value+1}).match(full_packet, (1, 2)))
 
     def test_header_phys(self):
         port_map = {(1,2):(5,10)}
         switch_map = {1:5}
         loc = nc.inport(1, 2)
         phys = loc.get_physical_predicate(switch_map, port_map)
-        self.assertEquals((5, 10), phys.pattern)
+        self.assertEquals((5, 10), phys.fields['loc'])
 
         loc = nc.inport(1, 0)
         phys = loc.get_physical_predicate(switch_map, port_map)
-        self.assertEquals((5, 0), phys.pattern)
+        self.assertEquals((5, 0), phys.fields['loc'])
 
         loc = nc.inport(0, 2)
         self.assertRaises(nc.PhysicalException,
             loc.get_physical_predicate, switch_map, port_map)
 
-        fields = nc.Header('srcmac', 3)
+        fields = nc.Header({'srcmac': 3})
         phys = fields.get_physical_predicate(switch_map, port_map)
         self.assertEquals(fields, phys)
 
     def test_union_match(self):
         loc = nc.inport(1,1)
-        field = nc.Header('srcmac', 1)
+        field = nc.Header({'srcmac': 1})
         union = loc + field
 
         self.assertTrue(union.match(blank_packet, (1, 1)))
@@ -114,7 +152,7 @@ class TestPredicate(unittest.TestCase):
 
     def test_intersection_match(self):
         loc = nc.inport(1,1)
-        field = nc.Header('srcmac', 1)
+        field = nc.Header({'srcmac': 1})
         inter = loc & field
 
         self.assertFalse(inter.match(fields_neg, (1, 1)))
@@ -124,13 +162,57 @@ class TestPredicate(unittest.TestCase):
 
     def test_difference_match(self):
         loc = nc.inport(1,1)
-        field = nc.Header('srcmac', 1)
+        field = nc.Header({'srcmac': 1})
         diff = loc - field
 
         self.assertTrue(diff.match(fields_neg, (1, 1)))
         self.assertFalse(diff.match(fields, (-1, -1)))
         self.assertFalse(diff.match(fields, (1, 1)))
         self.assertFalse(diff.match(fields_neg, (-1, -1)))
+
+    def test_union_reduce(self):
+        t = nc.Top()
+        b = nc.Bottom()
+        cases = [(red_target + red_target2, reduceable, reduceable2),
+                 (t, t, reduceable),
+                 (red_target, b, reduceable),
+                ]
+
+        for expected, r1, r2 in cases:
+            self.assertEqual(expected, (r1 + r2).reduce())
+            self.assertEqual(expected, (r2 + r1).reduce())
+
+    def test_intersection_reduce(self):
+        t = nc.Top()
+        b = nc.Bottom()
+        hd = nc.Header
+        cases = [(hd({'srcmac':1, 'dstmac':2, 'srcip':1, 'dstip':2}),
+                    reduceable, reduceable2),
+                 (red_target, t, reduceable),
+                 (b, b, reduceable),
+                 (b, b, b),
+                 (t, t, t),
+                 (b, nega_header - reduceable, reduceable2)
+                ]
+
+        for expected, r1, r2 in cases:
+            self.assertEqual(expected, (r1 & r2).reduce())
+            self.assertEqual(expected, (r2 & r1).reduce())
+
+    def test_difference_reduce(self):
+        t = nc.Top()
+        b = nc.Bottom()
+        hd = nc.Header
+        cases = [
+                 (red_target, reduceable, b),
+                 (b, reduceable, t),
+                 (b, b, b),
+                 (b, exact_header, reduceable),
+                 (exact_header,  exact_header, reduceable2),
+                 (nega_header, nega_header, reduceable),
+                ]
+        for expected, r1, r2 in cases:
+            self.assertEqual(expected, (r1 - r2).reduce())
 
     def test_nary_union(self):
         loc1 = nc.inport(1, 1)
@@ -144,9 +226,9 @@ class TestPredicate(unittest.TestCase):
         self.assertFalse(union.match(blank_packet, (-1,-1)))
 
     def test_nary_intersection(self):
-        field1 = nc.Header('srcmac', 1)
-        field2 = nc.Header('dstmac', 2)
-        field3 = nc.Header('ethtype', 3)
+        field1 = nc.Header({'srcmac': 1})
+        field2 = nc.Header({'dstmac': 2})
+        field3 = nc.Header({'ethtype': 3})
 
         inter = nc.nary_intersection([field1, field2, field3])
         self.assertTrue(inter.match(

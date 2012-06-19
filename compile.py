@@ -110,7 +110,7 @@ def isolated_policy(policy, vlan):
     RETURNS:
         a new policy object that is policy but restricted to its vlan.
     """
-    vlan_predicate = nc.Header('vlan', vlan)
+    vlan_predicate = nc.Header({'vlan': vlan})
     return policy % vlan_predicate
 
 # TODO(astory): make sure this doesn't pick up vlan traffic.
@@ -202,7 +202,7 @@ def external_to_vlan_policy(slic, policy, vlan):
                            for loc, pred in slic.edge_policy.iteritems()]
     predicate = nc.nary_union(external_predicates)
     policy_into_vlan = modify_vlan(policy, vlan)
-    return policy_into_vlan % (predicate & nc.Header('vlan', 0))
+    return policy_into_vlan % (predicate & nc.Header({'vlan': 0}))
 
 def internal_strip_vlan_policy(slic, policy):
     """Produce a policy that strips the vlan tags from outgoing edge ports.

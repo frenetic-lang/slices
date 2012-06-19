@@ -67,7 +67,7 @@ class TestSlice(unittest.TestCase):
         
     def test_policy_is_total(self):
         topo = total_policy_topo()
-        pred = netcore.Header('srcport', 80)
+        pred = netcore.Header({'srcport': 80})
         # Edge ports:
         # (1, 3)
         # (1, 4)
@@ -79,7 +79,7 @@ class TestSlice(unittest.TestCase):
   
     def test_assert_policy_is_total(self):
         topo = total_policy_topo()
-        pred = netcore.Header('srcport', 80)
+        pred = netcore.Header({'srcport': 80})
         # Edge ports:
         # (1, 3)
         # (1, 4)
@@ -90,7 +90,7 @@ class TestSlice(unittest.TestCase):
 
     def test_policy_is_total(self):
         topo = total_policy_topo()
-        pred = netcore.Header('srcport', 80)
+        pred = netcore.Header({'srcport': 80})
         # Edge ports:
         # (1, 3)
         # (1, 4)
@@ -112,7 +112,7 @@ class TestSlice(unittest.TestCase):
 
     def test_assert_not_policy_is_total(self):
         topo = total_policy_topo()
-        pred = netcore.Header('srcport', 80)
+        pred = netcore.Header({'srcport': 80})
         # Edge ports:
         # (1, 3)
         # (1, 4)

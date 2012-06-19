@@ -43,8 +43,8 @@ a5 = Action(3, [3, 5, 6, 7], {'vlan':5})
 
 p1 = inport(1, 0)
 p2 = inport(2, 1) + inport(2, 3)
-p3 = inport(3, 3) & Header('srcmac', 1)
-p4 = p3 - Header('dstmac', 2)
+p3 = inport(3, 3) & Header({'srcmac': 1})
+p4 = p3 - Header({'dstmac': 2})
 
 l1 = p1 |then| a1
 l2 = p2 |then| a2
@@ -89,9 +89,6 @@ class TestCompile(unittest.TestCase):
 
         modified_micro = flatten([action_to_microactions(a)
                                   for a in actions_of_policy(modified)])
-#       print "\n".join([str(x) for x in micro])
-#       print ""
-#       print "\n".join([str(x) for x in modified_micro])
 
         self.assertItemsEqual(micro, modified_micro)
 

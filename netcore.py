@@ -157,9 +157,67 @@ HEADER_FIELDS = set (['loc', # See Header for special note about this value
 def inport(switch, ports):
     """Construct a predicate accepting packets on one or a list of ports."""
     if isinstance(ports, type([])):
-        return nary_union([Header('loc', (switch, p)) for p in ports])
+        return nary_union([Header({'loc': (switch, p)}) for p in ports])
     else:
-        return Header('loc', (switch, ports))
+        return Header({'loc': (switch, ports)})
+
+def intersect_values(v1, v2):
+    """Return the intersection or None.
+
+    Properly intersects values with 0 as wildcard, or returns None if their
+    intersection is empty.  Follows the same rules laid out in intersect_headers
+    """
+    if v1 == 0:
+        # This also works for the 0, 0 case
+        return v2
+    elif v2 == 0:
+        return v1
+    elif v1 == v2:
+        return v1
+    else:
+        return None
+
+def intersect_headers(h1, h2):
+    """Return the intersection of two headers.
+
+    Since header fields are finite, we can easily compute their intersection
+    piecewise on each field.
+
+    * If a field is only present in one header or the other, just take it from
+      that one.
+    * If a field is present in both, but is zero in one, take it from the other
+    * If a field is present in both, and the same, copy it over
+    * If a field is present in both, and different, return Bottom since no
+      packet can match both headers, so the intersection of the two headers is
+      empty
+
+    For location fields, we do the same thing, but intersect the switch and port
+    independently.
+    """
+
+    f1 = copy.copy(h1.fields)
+    f2 = h2.fields
+    for f, p in f2.items():
+        if f in f1:
+            if f == 'loc':
+                s1, p1 = f1[f]
+                s2, p2 = p
+                s_int = intersect_values(s1, s2)
+                p_int = intersect_values(p1, p2)
+                if s_int is None or p_int is None:
+                    return Bottom()
+                else:
+                    f1[f] = (s_int, p_int)
+
+            else: # f != 'loc', just a single value
+                v = intersect_values(f1[f], p)
+                if v is None:
+                    return Bottom()
+                else:
+                    f1[f] = v
+        else: # f not in f1
+            f1[f] = p
+    return Header(f1)
 
 class Header(Predicate):
     """A predicate representing matching a header with a wildcard pattern.
@@ -167,27 +225,32 @@ class Header(Predicate):
     Matches a header against a wildcard.  Note that "header" fields also include
     switch and port fields.  See header_fields for a complete list
     """
-    def __init__(self, field, pattern):
+    def __init__(self, fields):
         """
-       ARGS:
+        ARGS:
+            fields: {field: pattern}
             field: header field to match pattern against
             pattern: (possibly) wildcarded bitstring, except in the case of loc,
                 where it's (switch, port), where both are ints, with 0
                 representing a wildcard.
+
+            Unset fields are the same as fields set to 0.  They are
+            automatically removed by the constructor.
         """
-        assert(field in HEADER_FIELDS)
-        if field == 'loc':
-            assert(len(pattern) == 2)
-        self.field = field
-        self.pattern = pattern
+        self.fields = {}
+        for f in fields:
+            assert(f in HEADER_FIELDS)
+            if f == 'loc':
+                assert(len(fields[f]) == 2)
+            if fields[f] != 0:
+                # If it's 0, it's a wildcard, so leave it out
+                self.fields[f] = fields[f]
 
     def __str__(self):
-        return "%s : %s" % (self.field, self.pattern)
+        return "Header: %s" % str(self.fields)
 
     def __eq__(self, other):
-        return (isinstance(other, Header) and
-            self.field == other.field and
-            self.pattern == other.pattern)
+        return (isinstance(other, Header) and self.fields == other.fields)
 
     def get_physical_predicate(self, switch_map, port_map):
         """ Creates a copy of this Predicate in which all logical
@@ -207,33 +270,40 @@ class Header(Predicate):
         ports and switches have been mapped to their physical
         counterparts
         """
-        if self.field == 'loc':
-            l_switch, l_port = self.pattern
-            if l_switch == 0:
-                if not l_port == 0:
-                    raise PhysicalException(
-                        'cannot map a logical port on a wildcard switch')
+        out_fields = {}
+        for f, p in self.fields.items():
+            if f == 'loc':
+                l_switch, l_port = p
+                if l_switch == 0:
+                    if not l_port == 0:
+                        raise PhysicalException(
+                            'cannot map a logical port on a wildcard switch')
+                    else:
+                        out_fields['loc'] = (0, 0)
                 else:
-                    return Header('loc', (0, 0))
+                    switch = switch_map[l_switch]
+                    if l_port == 0:
+                        out_fields[f] = (switch, 0)
+                    else:
+                        _, port = port_map[(l_switch, l_port)]
+                        out_fields[f] = (switch, port)
             else:
-                switch = switch_map[l_switch]
-                if l_port == 0:
-                    return Header('loc', (switch, 0))
-                else:
-                    _, port = port_map[(l_switch, l_port)]
-                    return Header('loc', (switch, port))
-        else:
-            # Matching on packet headers does not require mapping
-            return Header(self.field, self.pattern)
+                # Matching on packet headers does not require mapping
+                out_fields[f] = p
+        return Header(out_fields)
 
     def match(self, packet, (switch, port)):
         """Does this header match this located packet?"""
-        if self.field == 'loc':
-            (s, p) = self.pattern
-            return (s == 0 or s == switch) and (p == 0 or p == port)
-        else:
-            p = self.pattern
-            return p == 0 or p == packet[self.field]
+        for f, pat in self.fields.items():
+            if f == 'loc':
+                (s, p) = pat
+                if not ((s == 0 or s == switch) and (p == 0 or p == port)):
+                    return False
+            else:
+                p = pat
+                if p != packet[f]:
+                    return False
+        return True
 
 # Compound predicates
 class Union(Predicate):
@@ -257,8 +327,11 @@ class Union(Predicate):
         return "\n".join(["Union"] + left_lines + right_lines)
 
     def __eq__(self, other):
-        return self.left == other.left and self.right == other.right
+        return (isinstance(other, Union) and
+                ((self.left == other.left and self.right == other.right) or
+                 (self.right == other.left and self.left == other.right)))
 
+    # TODO(astory): top-reduction over subcomponents
     def reduce(self):
         r_left = self.left.reduce()
         r_right = self.right.reduce()
@@ -320,7 +393,9 @@ class Intersection(Predicate):
         return self.__str__()
 
     def __eq__(self, other):
-        return self.left == other.left and self.right == other.right
+        return (isinstance(other, Intersection) and
+                ((self.left == other.left and self.right == other.right) or
+                 (self.right == other.left and self.left == other.right)))
 
     def reduce(self):
         r_left = self.left.reduce()
@@ -331,6 +406,42 @@ class Intersection(Predicate):
             return r_right
         elif isinstance(r_right, Top):
             return r_left
+        # We can compute smaller predicates by re-writing some intersections
+        # The rule-of-thumb to follow is that if the transformation increases
+        # the AST depth unless bottom or top reduction occurs, it's probably not
+        # worth it.
+        elif isinstance(r_left, Header) and isinstance(r_right, Header):
+            # We can form the intersection manually.
+            return intersect_headers(r_left, r_right)
+        # This transformation does not increase the depth
+        elif isinstance(r_left, Union) and isinstance(r_right, Header):
+            u_left = (r_left.left & r_right).reduce()
+            u_right = (r_left.right & r_right).reduce()
+            return u_left + u_right
+        elif isinstance(r_right, Union) and isinstance(r_left, Header):
+            u_left = (r_right.left & r_left).reduce()
+            u_right = (r_right.right & r_left).reduce()
+            return u_left + u_right
+        # If one side of the intersection is also an intersection, but didn't
+        # reduce, we might get it to reduce by moving the other predicate over
+        # to it, and it doesn't increase depth
+        elif isinstance(r_left, Intersection) and isinstance(r_right, Header):
+            i_left = (r_left.left & r_right).reduce()
+            i_right = (r_left.right & r_right).reduce()
+            return i_left & i_right
+        elif isinstance(r_right, Intersection) and isinstance(r_left, Header):
+            i_left = (r_right.left & r_left).reduce()
+            i_right = (r_right.right & r_left).reduce()
+            return i_left & i_right
+        # Don't do union-union because that gets too combinatorically messy
+        # Note that nary unions are produced with n-1 unions, so this should
+        # traverse down them.
+        elif isinstance(r_left, Difference) and isinstance(r_right, Header):
+            d_left = (r_left.left & r_right).reduce()
+            return (d_left - r_left.right).reduce()
+        elif isinstance(r_right, Difference) and isinstance(r_left, Header):
+            d_left = (r_right.left & r_left).reduce()
+            return (d_left - r_right.right).reduce()
         else:
             return r_left & r_right
 
@@ -390,8 +501,38 @@ class Difference(Predicate):
         r_right = self.right.reduce()
         if isinstance(r_left, Bottom) or isinstance(r_right, Top):
             return Bottom()
-        elif isinstance(r_right, Top):
+        elif isinstance(r_right, Bottom):
             return r_left
+        elif isinstance(r_left, Header) and isinstance(r_right, Header):
+            # if a field is in left, and is specified to something different in
+            # right, then there are no packets that are restricted by the
+            # difference, since no packets matched by left are matched by right
+            total_match = True
+            for f in r_right.fields:
+                # don't deal with locations, they're too messy for now
+                if (f != 'loc' and
+                        f in r_left.fields and
+                        r_right.fields[f] != r_left.fields[f]):
+                    # If left only matches packets with f:x, and right only
+                    # matches packets with f:y, then right does not restrict
+                    # left at all.  With a fixed field in right's predicate,
+                    # this makes right _entirely_ useless, so there's no point
+                    # in checking the rest.
+                    return r_left
+                elif (f != 'loc' and
+                        f in r_left.fields and
+                        r_left.fields[f] == r_right.fields[f]):
+                    pass
+                else:
+                    total_match = False
+            if total_match:
+                # Each field in right matches left, which means that right
+                # matches all the packets left does (plus maybe more).  Thus, no
+                # packets are in the difference, because there are no packets in
+                # left that are not in right.
+                return Bottom()
+            else:
+                return r_left - r_right
         else:
             return r_left - r_right
 
@@ -534,6 +675,10 @@ class Policy:
         """Return copy with removed redundencies."""
         return copy.deepcopy(self)
 
+    @abstractmethod
+    def restrict(self, predicate):
+        """Return this policy restricted by a predicate internally."""
+
     def __add__(self, other):
         return PolicyUnion(self, other)
 
@@ -550,6 +695,9 @@ class BottomPolicy(Policy):
 
     def get_actions(self, packet, loc):
         return []
+
+    def restrict(self, predicate):
+        return Bottom()
 
     def __str__(self):
         return "BottomPolicy"
@@ -598,6 +746,9 @@ class PrimitivePolicy(Policy):
     def reduce(self):
         r_pred = self.predicate.reduce()
         return r_pred |then| self.actions
+
+    def restrict(self, predicate):
+        return (self.predicate & predicate) |then| actions
 
     def get_physical_rep(self, switch_map, port_map):
         """ Creates a copy of this object in which all logical
@@ -658,6 +809,11 @@ class PolicyUnion(Policy):
         else:
             return r_right + r_left
 
+    def restrict(self, predicate):
+        r_left = self.left.restrict(predicate)
+        r_right = self.right.restrict(predicate)
+        return r_left + r_right
+
     def get_physical_rep(self, switch_map, port_map):
         """ Creates a copy of this object in which all logical
         ports and switches have been mapped to their physical
@@ -693,8 +849,6 @@ def nary_policy_union(policies):
         base = policies[0]
         return sum(policies[1:], base)
 
-# Maybe we can provide this with just a function that transforms the policy?
-# -astory
 class PolicyRestriction(Policy):
     """A policy restricted by a predicate."""
     def __init__(self, policy, predicate):
@@ -741,6 +895,9 @@ class PolicyRestriction(Policy):
         pol = self.policy.get_physical_rep(switch_map, port_map)
         pred = self.predicate.get_physical_predicate(switch_map, port_map)
         return PolicyRestriction(pol, pred)
+
+    def restrict(self, predicate):
+        return self.pol.restrict(self.predicate & predicate)
 
     def get_actions(self, packet, loc):
         if self.predicate.match(packet, loc):
