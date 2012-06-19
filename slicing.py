@@ -171,7 +171,8 @@ class Slice:
             switches = set(self.l_topo.nodes())
         for switch in switches:
             for port in self.l_topo.node[switch]['ports'].values():
-                ports.add((switch, port))
+                if port != 0 or self.map_end_hosts:
+                    ports.add((switch, port))
 
         assert_set_equals(switches, 
                           set(self.node_map.keys()))
