@@ -71,21 +71,12 @@ def get_slices():
     b_p_map = util.id_map(blue_ports)
     r_p_map = util.id_map(red_ports)
 
-    g_preds = build_external_predicate(green_topo)
-    b_preds = build_external_predicate(blue_topo)
-    r_preds = build_external_predicate(red_topo)
+    g_preds = util.build_external_predicate(green_topo)
+    b_preds = util.build_external_predicate(blue_topo)
+    r_preds = util.build_external_predicate(red_topo)
 
     green_slice = slicing.Slice(green_topo, p_topo, g_s_map, g_p_map, g_preds)
     blue_slice  = slicing.Slice(blue_topo,  p_topo, b_s_map, b_p_map, b_preds)
     red_slice   = slicing.Slice(red_topo,   p_topo, r_s_map, r_p_map, r_preds)
 
     return p_topo, (green_slice, blue_slice, red_slice)
-
-def build_external_predicate(l_topo):
-    predicates = {}
-    for n, node in l_topo.node.items():
-        if node['isSwitch']:
-            for p, (target, target_port) in node['port'].items():
-                if target_port == 0: # that means target is an end host
-                    predicates[(n, p)] = nc.Top()
-    return predicates
