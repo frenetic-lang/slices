@@ -3,6 +3,9 @@ import nxtopo
 import slicing
 import netcore as nc
 
+# Morally, this uses the same topology as topology_gen.hierarchy(2, [], 3, 1),
+# but since several test cases already depend on it being organized the way it
+# is, it's not worth changing it to use the generator -astory
 def get_slices():
     p_topo = nxtopo.NXTopo()
     p_topo.add_switch(1)
