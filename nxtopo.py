@@ -32,6 +32,23 @@ from mininet.topo import Topo, Node
 import copy
 import networkx as nx
 
+def from_graph(graph, data=False):
+    """Convert another NetworkX graph to an nxtopo.
+
+    Marks all nodes as switches.  Copies extra data in the nodes if data=True.
+    """
+    topo = NXTopo()
+    if data:
+        for node, data in graph.nodes(data=True):
+            topo.add_switch(node, data)
+        for n1, n2, data in graph.edge(data=True):
+            topo.add_edge(n1, n2, data)
+    else:
+        for node in graph.nodes():
+            topo.add_switch(node)
+        for n1, n2 in graph.edge():
+            topo.add_edge(n1, n2)
+
 class NXTopo(nx.Graph):
     """Representation of network switches.
 
@@ -62,7 +79,7 @@ class NXTopo(nx.Graph):
     def add_link(self,hid,sid):
         assert not self.finalized
         self.add_edge(hid,sid)
-        
+
     def switches(self):
         assert self.finalized
         return [s for (s,d) in self.nodes(data=True) if d['isSwitch']]
@@ -147,28 +164,28 @@ class NXTopo(nx.Graph):
     def finalize(self):
         # make mininet topo
         topo = Topo()
-        
+
         # add nodes
         for x,d in self.nodes(data=True):
             topo.add_node(x,Node(is_switch=d['isSwitch']))
-                
+
         # add links
         for src,dst in self.edges():
             topo.add_edge(src,dst)
-            
+
         # backpatch ports into original graph
         for x in self.nodes():
             self.node[x]['ports'] = {}
-            self.node[x]['port'] = {}            
+            self.node[x]['port'] = {}
             for y in self.neighbors(x):
                 x_port, y_port = topo.port(x,y)
                 self.node[x]['ports'][y] = x_port
-                # Support indexing in by port to get neighbor switch/port                
+                # Support indexing in by port to get neighbor switch/port
                 self.node[x]['port'][x_port] = (y, y_port)
 
-        
+
         topo.enable_all()
-        self.topo = topo        
+        self.topo = topo
         self.finalized = True
 
     def nx_graph(self):
