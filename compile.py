@@ -66,13 +66,14 @@ from netcore import then
 import slicing
 import vlan as vl
 
-def transform(combined, assigner=vl.sequential):
+def transform(combined, assigner=vl.sequential, verbose=False):
     """Turn a set of slices sharing a physical topology into a single policy.
     ARGS:
         combined:  set of (slices, policies) (with the same physical topology) to
             combine
         assigner:  function to use to assign vlans to slices.  Must return a
             {slice: vlan} dictionary, defaults to sequential.
+        verbose:  print out progress information
 
     RETURNS:
         a single Policy encapsulating the shared but isolated behavior of all
@@ -81,6 +82,7 @@ def transform(combined, assigner=vl.sequential):
     slices = [s for (s, p) in combined]
     vlans = assigner(slices)
     policy_list = []
+    count = 0
     for slic, policy in combined:
         vlan = vlans[slic]
         # Produce a policy that only accepts packets within our vlan
@@ -98,6 +100,9 @@ def transform(combined, assigner=vl.sequential):
 
         policy_list.append(
             full_policy.get_physical_rep(slic.node_map, slic.port_map))
+        if verbose:
+            print 'Processed %d slices.' % count
+            count += 1
     return nc.nary_policy_union(policy_list)
 
 def isolated_policy(policy, vlan):
@@ -142,18 +147,18 @@ def modify_vlan(policy, vlan):
         return new_policy % policy.predicate
 
 def modify_vlan_local(policy, (switch, port), tag):
-    """Re-write all actions of policy to set vlan to tag on switch, port."""
-    assert(isinstance(policy, nc.Policy))
+    """Re-write all actions of policy to set vlan to tag on switch, port.
+
+    Non-destructive, returns an entirely new object.
+    """
     if isinstance(policy, nc.PrimitivePolicy):
         # get a new copy of all the actions so we can safely modify them
-        actions = copy.deepcopy(policy.actions)
         output_actions = []
-        for action in actions:
+        for action in policy.actions:
             if action.switch == switch and port in action.ports:
                 # Split ports into ports we need to change and ports we don't
                 bad_ports = [port]
-                good_ports = action.ports
-                good_ports.remove(port)
+                good_ports = set(action.ports).difference([port])
 
                 # Build new actions around these objects
                 out_modify = dict(action.modify)
@@ -161,7 +166,8 @@ def modify_vlan_local(policy, (switch, port), tag):
                 out_a = nc.Action(switch, bad_ports, out_modify)
                 output_actions.append(out_a)
                 if len(good_ports) > 0:
-                    output_actions.append(action)
+                    output_actions.append(nc.Action(switch, good_ports,
+                                                    action.modify))
             else:
                 # No need to modify it
                 output_actions.append(action)
@@ -173,6 +179,8 @@ def modify_vlan_local(policy, (switch, port), tag):
     elif isinstance(policy, nc.PolicyRestriction):
         new_policy = modify_vlan_local(policy.policy, (switch, port), tag)
         return new_policy % policy.predicate
+    elif isinstance(policy, nc.BottomPolicy):
+        return policy
     else:
         raise Exception("Unexpected policy: %s\n" % policy)
 
@@ -196,8 +204,6 @@ def external_to_vlan_policy(slic, policy, vlan):
         A policy that moves packets incoming to external ports into the vlan,
         but only if they satisfy the slice's isolation predicates.
     """
-    assert(isinstance(slic, slicing.Slice))
-    assert(isinstance(policy, nc.Policy))
     external_predicates = [external_predicate(loc, pred)
                            for loc, pred in slic.edge_policy.iteritems()]
     predicate = nc.nary_union(external_predicates)
@@ -206,7 +212,7 @@ def external_to_vlan_policy(slic, policy, vlan):
 
 def internal_strip_vlan_policy(slic, policy):
     """Produce a policy that strips the vlan tags from outgoing edge ports.
-    
+
     The produced policy can be thought of as working the following way:
         def actions(packet, loc):
             acts = policy.get_actions(packet, loc)

@@ -92,9 +92,13 @@ class Predicate:
     def __repr__(self):
         return self.__str__()
 
+    @abstractmethod
     def reduce(self):
-        """Return copy with removed redundencies."""
-        return copy.deepcopy(self)
+        """Return a copy with removed redundencies."""
+        pass
+
+    def is_bottom(self):
+        return False
 
     def __add__(self, other):
         return Union(self, other)
@@ -119,6 +123,9 @@ class Top(Predicate):
     def match(self, packet, (switch, port)):
         return True
 
+    def reduce(self):
+        return Top()
+
     def __str__(self):
         return "Top"
 
@@ -133,8 +140,14 @@ class Bottom(Predicate):
     def get_physical_predicate(self, switch_map, port_map):
         return Bottom()
 
+    def is_bottom(self):
+        return True
+
     def match(self, packet, (switch, port)):
         return False
+
+    def reduce(self):
+        return Bottom()
 
     def __str__(self):
         return "Bottom"
@@ -202,12 +215,11 @@ class Header(Predicate):
         """
         ARGS:
             fields: {field: pattern}
-            field: header field to match pattern against
-            pattern: value to match.
+
+        field: header field to match pattern against
+        pattern: value to match.
         """
         self.fields = {}
-        for f in fields:
-            assert(f in HEADER_FIELDS)
         self.fields = fields
 
     def __str__(self):
@@ -215,6 +227,9 @@ class Header(Predicate):
 
     def __eq__(self, other):
         return (isinstance(other, Header) and self.fields == other.fields)
+
+    def reduce(self):
+        return Header(self.fields)
 
     def get_physical_predicate(self, switch_map, port_map):
         """ Creates a copy of this Predicate in which all logical
@@ -278,8 +293,6 @@ class Union(Predicate):
             left: first predicate to union
             right: second predicate to union
         """
-        assert(isinstance(left, Predicate))
-        assert(isinstance(right, Predicate))
         self.left = left
         self.right = right
 
@@ -301,9 +314,9 @@ class Union(Predicate):
         r_right = self.right.reduce()
         if isinstance(r_left, Top) or isinstance(r_right, Top):
             return Top()
-        elif isinstance(r_left, Bottom):
+        elif r_left.is_bottom():
             return r_right
-        elif isinstance(r_right, Bottom):
+        elif r_right.is_bottom():
             return r_left
         else:
             return r_left + r_right
@@ -341,8 +354,6 @@ class Intersection(Predicate):
             left: first predicate to intersection
             right: second predicate to intersection
         """
-        assert(isinstance(left, Predicate))
-        assert(isinstance(right, Predicate))
         self.left = left
         self.right = right
 
@@ -364,7 +375,7 @@ class Intersection(Predicate):
     def reduce(self):
         r_left = self.left.reduce()
         r_right = self.right.reduce()
-        if isinstance(r_left, Bottom) or isinstance(r_right, Bottom):
+        if r_left.is_bottom() or r_right.is_bottom():
             return Bottom()
         elif isinstance(r_left, Top):
             return r_right
@@ -381,11 +392,11 @@ class Intersection(Predicate):
         elif isinstance(r_left, Union) and isinstance(r_right, Header):
             u_left = (r_left.left & r_right).reduce()
             u_right = (r_left.right & r_right).reduce()
-            return u_left + u_right
+            return (u_left + u_right).reduce()
         elif isinstance(r_right, Union) and isinstance(r_left, Header):
             u_left = (r_right.left & r_left).reduce()
             u_right = (r_right.right & r_left).reduce()
-            return u_left + u_right
+            return (u_left + u_right).reduce()
         # If one side of the intersection is also an intersection, but didn't
         # reduce, we might get it to reduce by moving the other predicate over
         # to it, and it doesn't increase depth
@@ -396,7 +407,7 @@ class Intersection(Predicate):
         elif isinstance(r_right, Intersection) and isinstance(r_left, Header):
             i_left = (r_right.left & r_left).reduce()
             i_right = (r_right.right & r_left).reduce()
-            return i_left & i_right
+            return (i_left & i_right).reduce()
         # Don't do union-union because that gets too combinatorically messy
         # Note that nary unions are produced with n-1 unions, so this should
         # traverse down them.
@@ -442,8 +453,6 @@ class Difference(Predicate):
             left: set to subtract from
             right: set to subtract
         """
-        assert(isinstance(left, Predicate))
-        assert(isinstance(right, Predicate))
         self.left = left
         self.right = right
 
@@ -463,9 +472,9 @@ class Difference(Predicate):
     def reduce(self):
         r_left = self.left.reduce()
         r_right = self.right.reduce()
-        if isinstance(r_left, Bottom) or isinstance(r_right, Top):
+        if r_left.is_bottom() or isinstance(r_right, Top):
             return Bottom()
-        elif isinstance(r_right, Bottom):
+        elif r_right.is_bottom():
             return r_left
         elif isinstance(r_left, Header) and isinstance(r_right, Header):
             # if a field is in left, and is specified to something different in
@@ -561,8 +570,6 @@ class Action:
             modify: dictionary of header fields to values, fields that are set
                 will overwrite the packet's fields
         """
-        assert(isinstance(ports, type([])))
-        assert(isinstance(modify, type({})))
         self.switch = switch
         self.ports = ports
         self.modify = modify
@@ -633,7 +640,10 @@ class Policy:
 
     def reduce(self):
         """Return copy with removed redundencies."""
-        return copy.deepcopy(self)
+        return self.__class__()
+
+    def is_bottom(self):
+        return False
 
     @abstractmethod
     def restrict(self, predicate):
@@ -655,6 +665,9 @@ class BottomPolicy(Policy):
 
     def get_actions(self, packet, loc):
         return []
+
+    def is_bottom(self):
+        return True
 
     def restrict(self, predicate):
         return Bottom()
@@ -691,8 +704,6 @@ class PrimitivePolicy(Policy):
                 action.  In this way, a PrimitivePolicy may result in multiple
                 packets.  Note that actions may be the empty list.
         """
-        assert(isinstance(predicate, Predicate))
-        assert(isinstance(actions, type([])))
         self.predicate = predicate
         self.actions = actions
 
@@ -705,10 +716,15 @@ class PrimitivePolicy(Policy):
 
     def reduce(self):
         r_pred = self.predicate.reduce()
-        return r_pred |then| self.actions
+        if r_pred.is_bottom():
+            return BottomPolicy()
+        else:
+            # Prefer direct constructor here for speed over clarity
+            # same as r_pred |then| actions
+            return PrimitivePolicy(r_pred, self.actions)
 
     def restrict(self, predicate):
-        return (self.predicate & predicate) |then| actions
+        return (self.predicate & predicate) |then| self.actions
 
     def get_physical_rep(self, switch_map, port_map):
         """ Creates a copy of this object in which all logical
@@ -747,8 +763,6 @@ class PolicyUnion(Policy):
             left: first policy to union
             right: second policy to union
         """
-        assert(isinstance(left, Policy))
-        assert(isinstance(right, Policy))
         self.left = left
         self.right = right
 
@@ -762,12 +776,12 @@ class PolicyUnion(Policy):
     def reduce(self):
         r_left = self.left.reduce()
         r_right = self.right.reduce()
-        if isinstance(r_left, BottomPolicy):
+        if r_left.is_bottom():
             return r_right
-        elif isinstance(r_right, BottomPolicy):
+        elif r_right.is_bottom():
             return r_left
         else:
-            return r_right + r_left
+            return r_left + r_right
 
     def restrict(self, predicate):
         r_left = self.left.restrict(predicate)
@@ -817,8 +831,6 @@ class PolicyRestriction(Policy):
             policy: policy to restrict
             predicate: predicate to restrict it by
         """
-        assert(isinstance(policy, Policy))
-        assert(isinstance(predicate, Predicate))
         self.policy = policy
         self.predicate = predicate
 
@@ -830,9 +842,8 @@ class PolicyRestriction(Policy):
         return "\n".join(["PolicyRestriction"] + left_lines + right_lines)
 
     def reduce(self):
-        r_pol = self.policy.reduce()
         r_pred = self.predicate.reduce()
-        return r_pol % r_pred
+        return self.policy.restrict(r_pred).reduce()
 
     def get_physical_rep(self, switch_map, port_map):
         """ Creates a copy of this object in which all logical
@@ -857,7 +868,7 @@ class PolicyRestriction(Policy):
         return PolicyRestriction(pol, pred)
 
     def restrict(self, predicate):
-        return self.pol.restrict(self.predicate & predicate)
+        return self.policy.restrict(self.predicate & predicate)
 
     def get_actions(self, packet, loc):
         if self.predicate.match(packet, loc):

@@ -37,37 +37,53 @@
 #              to their policies and seeing if they turn up empty, which would
 #              let us prune the tree using the existing reduction steps.
 
+from compile import external_predicate, modify_vlan_local
+import copy
 import netcore as nc
 import vlan as vl
-from compile import external_predicate, modify_vlan_local
 
 VLAN0 = nc.Header({'vlan': 0})
 
-def transform(topo, slices, assigner=vl.edge_optimal):
+def transform(topo, slices, assigner=vl.edge_optimal, verbose=False):
     """Turn a set of slices sharing a physical topology into a single policy.
     ARGS:
         slices:  set of (slices, policies) (with the same physical topology) to
             combine
         assigner:  function to use to assign vlans to slices.  Must return a
             {slice: vlan} dictionary, defaults to sequential.
+        verbose:  print out progress information
 
     RETURNS:
         a single Policy encapsulating the shared but isolated behavior of all
         the slices
     """
     slice_only = [s for (s, p) in slices]
-    vlans = assigner(topo, slice_only)
-    #print "\n".join([str(s) for s in vlans.items()])
+    if verbose:
+        import sys
+        print 'Assigning slice vlans...',
+    vlans = assigner(topo, slice_only, verbose=verbose)
     slice_lookup = get_slice_lookup(vlans)
+    if verbose:
+        print 'done.'
+        print 'Compiling slices...',
     policy_list = []
+    count = 0
     for slic, policy in slices:
         vlan_dict = symmetric_edge(slice_lookup[slic])
         internal_p = internal_policy(slic.l_topo, policy, vlan_dict)
         external_p = external_policy(slic, policy, vlan_dict)
         policies = [p.get_physical_rep(slic.node_map, slic.port_map)
                     for p in internal_p + external_p]
+        policies = [p for p in policies if not isinstance(p, nc.BottomPolicy)]
         policy_list.extend(policies)
-    return nc.nary_policy_union(policy_list).reduce()
+        if verbose:
+            count += 1
+            print '.',
+            sys.stdout.flush()
+    if verbose:
+        print 'done.'
+        print '%d policies generated.' % len(policy_list)
+    return nc.nary_policy_union(policy_list)
 
 def edge_of_port(topo, (switch, port)):
     """Return the edge that port traverses in topo.
@@ -115,7 +131,6 @@ def internal_policy(topo, policy, symm_vlan):
     """
     policies = []
     # incoming edge to s1.  Note that we only get internal edges
-    print symm_vlan
     for ((s1, p1), (s2, p2)), tag in symm_vlan.items():
         if s1 in topo.node:
             pred = nc.inport(s1, p1) & nc.Header({'vlan': tag})
@@ -125,9 +140,11 @@ def internal_policy(topo, policy, symm_vlan):
                     target_vlan = symm_vlan[((s1, p_out), dst)]
                 else:
                     target_vlan = 0
-                policies.append(modify_vlan_local(policy % pred,
-                                                  (s1, p_out),
-                                                  target_vlan).reduce())
+                new_policy = (policy % pred).reduce()
+                new_policy = modify_vlan_local(new_policy, (s1, p_out),
+                                          target_vlan)
+                # modify_vlan_local does not create any new reduceables
+                policies.append(new_policy)
     return policies
 
 def external_policy(slic, policy, symm_vlan):
@@ -162,11 +179,32 @@ def external_policy(slic, policy, symm_vlan):
             for (p_out, dst) in slic.l_topo.node[s]['port'].items():
                 if ((s, p_out), dst) in symm_vlan: # it's an internal edge
                     target_vlan = symm_vlan[((s, p_out), dst)]
-                    policies.append(modify_vlan_local(policy % ext_pred,
-                                                      (s, p_out),
-                                                      target_vlan).reduce())
+                    new_policy = (policy % ext_pred).reduce()
+                # modify_vlan_local does not create any new reduceables
+                    policies.append(modify_vlan_local(new_policy, (s, p_out),
+                                                      target_vlan))
                 else: # outgoing, set it to 0
                     # but since we already know the packet is set to 0, just
                     # append the policy
-                    policies.append(policy % ext_pred)
+                    new_policy = (policy % ext_pred).reduce()
+                    policies.append(new_policy)
     return policies
+
+def stress_test(inp=None, n=256):
+    """Run a stress test, for profiling.
+
+    can use inp=(topo, zip(slices, policies)) if you already have it.
+    Otherwise, uses the n-ary break_vlans graph and slices.
+    """
+    if inp is None:
+        from examples import break_vlans, policy_gen
+        topo, slices = break_vlans.get_slices(n=n)
+        policies = [policy_gen.flood(s.l_topo, all_ports=True) for s in slices]
+        combined = zip(slices, policies)
+    else:
+        topo, combined = inp
+
+    transformed = transform(topo, combined, verbose=True)
+
+if __name__ == '__main__':
+    stress_test(n=25)

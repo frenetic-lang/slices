@@ -61,10 +61,10 @@ def edges_of_topo(topo, undirected=False):
     for switch in topo.switches():
         lnks.extend(links(topo, switch))
     if undirected:
-        lnks_new = []
+        lnks_new = set()
         for (source, sink) in lnks:
             if (sink, source) not in lnks_new:
-                lnks_new.append((source, sink))
+                lnks_new.add((source, sink))
         return lnks_new
     else:
         return lnks
@@ -82,11 +82,16 @@ def map_edges(lnks, switch_map, port_map):
 # TODO(astory): deal with unidirectional ports.  This should really be done by
 # just looking at incoming ports, but it gets a bit more complicated because now
 # you have to assign vlans in a unified way to everything incident to that port
-def edge_in(edge, slic):
+def edge_in(edge, slic, memo=None):
     """Determine whether a slice uses a given physical edge"""
-    slice_edges = set(map_edges(edges_of_topo(slic.l_topo),
-                                          slic.node_map, slic.port_map))
-    return edge in slice_edges
+    if memo is not None:
+        if slic not in memo:
+            memo[slic] = set(map_edges(edges_of_topo(slic.l_topo),
+                                       slic.node_map, slic.port_map))
+        return edge in memo[slic]
+    else:
+        return edge in set(map_edges(edges_of_topo(slic.l_topo),
+                                       slic.node_map, slic.port_map))
 
 def share_edge(s1, s2):
     """Determine whether two slices share a physical edge."""
@@ -111,20 +116,31 @@ def slice_optimal(slices):
     else:
         raise VlanException('Could not assign vlan tags - too many slices')
 
-def edge_optimal(topo, slices):
+def edge_optimal(topo, slices, verbose=False):
     """Return the minimum per-slice-per-edge vlan assignment.
+
+    verbose: print a '.' every 1000 edges processed
     
     RETURNS: {edge: {slice: tag}}.  Note that while this is inconvenient to work
         with from slices, it's much more convenient to generate.  If you want
         {slice: {edge: tag}}, there's a converter in edge_compile.py
     """
+    if verbose:
+        import sys
+        count = 0
     edges = edges_of_topo(topo, undirected=True)
     edge_slices = {}
+    slice_edges = {}
     for edge in edges:
         edge_slices[edge] = set()
         for slic in slices:
-            if edge_in(edge, slic):
+            if edge_in(edge, slic, memo=slice_edges):
                 edge_slices[edge].add(slic)
+        if verbose:
+            count +=1
+            if count % 1000 == 0:
+                print '.',
+                sys.stdout.flush()
     edge_vlans = {}
     for (edge, slics) in edge_slices.items():
         edge_vlans[edge] = dict(zip(slics, range(1, len(slics) + 1)))

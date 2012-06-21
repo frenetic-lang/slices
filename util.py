@@ -30,6 +30,8 @@
 ################################################################################
 """Tools for slicing."""
 
+import netcore as nc
+
 def id_map(items):
     """Make a mapping that is the identity over items."""
     return dict((i, i) for i in items)
