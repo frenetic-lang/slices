@@ -72,9 +72,6 @@ def assign_vlans(slices, conflicts):
         return None
 
 def main():
-    pass
-
-if __name__ == '__main__':
     slices = [1, 2, 3, 4]
     # Graph is 3 colorable
     conflicts = [
@@ -85,3 +82,6 @@ if __name__ == '__main__':
                  (3, 4),
                 ]
     print assign_vlans(slices, conflicts)
+
+if __name__ == '__main__':
+    main()
