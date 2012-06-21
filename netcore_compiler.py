@@ -61,11 +61,12 @@ The following restrictions on NetCore are currently in place:
 #
 
 import netcore
-import policy
+import updates.policy as policy
 import logging
 
 # Translation from NetCore to policy.py header names.
 FIELD_TRANSLATION = {
+  'port': policy.Pattern.IN_PORT,
   'srcmac' : policy.Pattern.DL_SRC,
   'dstmac' : policy.Pattern.DL_DST,
   'ethtype' : policy.Pattern.DL_TYPE,
@@ -77,8 +78,19 @@ FIELD_TRANSLATION = {
   'dstport' : policy.Pattern.TP_DST
   }
 
+def translate_fields(fields):
+    """Convert {netcore_field: value} -> {policy_field: value}.
+
+    Removes switch from the field.
+    """
+    output = {}
+    for k, v in fields.items():
+        if k is not 'switch':
+            output[FIELD_TRANSLATION[k]] = v
+    return output
+
 class ConstraintException(Exception):
-    """Exception representing a violation of a constraint imposed on the 
+    """Exception representing a violation of a constraint imposed on the
        NetCore IR."""
     def __init__(self, value):
         self.value = value
@@ -142,7 +154,7 @@ def minimize_bones(bones):
     #   *        : DROP
     i = 1
     while i < len(new_bones) - 1:
-        if (new_bones[-i].action == new_bones[-(i+1)].action 
+        if (new_bones[-i].action == new_bones[-(i+1)].action
             and pattern_is_subset(new_bones[-(i+1)].pattern, new_bones[-i].pattern)):
             del new_bones[-(i+1)]
         else:
@@ -204,18 +216,17 @@ def compile_predicate_header(switch, header):
 #        raise ConstraintException(
 #          "Pattern in '%s' is not a number (wildcards currently disallowed)." % header)
 
-    # Location is a special case.  Morally, return
-    # (switch : sw) /\ (port : p).
-    if header.field == 'loc':
-        sw,p = header.pattern
-        switchMatches = (sw == switch or sw == 0)
-        if p != 0:
-            d = {policy.Pattern.IN_PORT : p}
-            return [Bone(d, switchMatches), Bone({}, False)]
-        return [Bone({}, switchMatches)]
-
-    d = {FIELD_TRANSLATION[header.field] : header.pattern}
-    return [Bone(d, True), Bone({}, False)]
+    fields = header.fields
+    if 'switch' in fields:
+        sw = fields['switch']
+        switchMatches = (sw == switch)
+    else:
+        switchMatches = 2
+    d = translate_fields(fields)
+    if len(d) > 0:
+        return [Bone(d, switchMatches), Bone({}, False)]
+    else:
+        return [Bone(d, switchMatches)]
 
 def compile_binary_predicate(switch, p, f):
     '''Compile f.left and f.right, then apply f to merge the results.'''
@@ -226,14 +237,14 @@ def compile_binary_predicate(switch, p, f):
 
 def compile_predicate(switch, p):
     '''
-    Compile a NetCore predicate with respect to a given switch, 
+    Compile a NetCore predicate with respect to a given switch,
     producing a list of Bones, wherein actions are True or False.
     '''
     assert(isinstance(p, netcore.Predicate))
     if isinstance(p, netcore.Top):
         return [Bone({}, True)]
     elif isinstance(p, netcore.Bottom):
-        raise [Bone({}, False)]
+        return [Bone({}, False)]
     elif isinstance(p, netcore.Header):
         return compile_predicate_header(switch, p)
     elif isinstance(p, netcore.Union):
@@ -255,7 +266,7 @@ def compile_action(action):
     # Convert any modify actions
     for k,v in action.modify.iteritems():
         newActions.append(policy.modify((FIELD_TRANSLATION[k],v)))
-    
+
     # Convert the forward action
     for p in action.ports:
         newActions.append(policy.forward(p))
@@ -294,7 +305,7 @@ def compile_actions(actions):
     assert(isinstance(actions, type([])))
     # Fail if we cannot establish a subset ordering on the modifications
     # of each action.
-    # i.e. it is safe to do 
+    # i.e. it is safe to do
     #   (VLAN = 1, Forward 1), (VLAN = 1 IP = 2, Forward 2)
     actions.sort(cmp=pattern_cmp, key=(lambda action: action.modify))
 
@@ -372,13 +383,13 @@ def compile_policy_restriction(switch, p):
     assert(isinstance(p, netcore.PolicyRestriction))
     bonesPolicy = compile_policy(switch, p.policy)
     bonesPred = compile_predicate(switch, p.predicate)
-    return bones_cross_product(bonesPred, 
-                               bonesPolicy, 
+    return bones_cross_product(bonesPred,
+                               bonesPolicy,
                                lambda b, a: a if b else [])
 
 def compile_policy(switch, p):
     '''
-    Compile a NetCore policy with respect to a given switch, producing a list 
+    Compile a NetCore policy with respect to a given switch, producing a list
     of Bones, where actions are lists of NetCore actions.
     '''
     assert(isinstance(p, netcore.Policy))
@@ -418,8 +429,8 @@ def translate_bones_to_rules(bones):
     for b in bones:
         assert('loc' not in b.pattern)
 
-    return [policy.Rule(policy.Pattern(old=p), acts) 
-            for p, acts 
+    return [policy.Rule(policy.Pattern(old=p), acts)
+            for p, acts
             in map(lambda b: (b.pattern, compile_actions(b.action)), bones)]
 
 def prune_predicate(switch, pred):
@@ -453,7 +464,7 @@ def prune_predicate(switch, pred):
             return p1
         return netcore.Difference(p1, p2)
     else:
-        raise ConstraintException("Unsupported predicate: %s" % p)
+        raise ConstraintException("Unsupported predicate: %s" % pred)
 
 def prune_policy(switch, pol):
     assert(isinstance(pol, netcore.Policy))
@@ -483,7 +494,7 @@ def prune_policy(switch, pol):
             return p1
         return netcore.PolicyRestriction(p1, pred)
     else:
-        raise ConstraintException("Unsupported policy: %s" % p)
+        raise ConstraintException("Unsupported policy: %s" % pred)
 
 def compile(topo, pol):
     '''
