@@ -562,17 +562,19 @@ def forward(switch, ports):
 
 class Action:
     """Description of a forwarding action, with possible modification."""
-    def __init__(self, switch, ports=[], modify=dict()):
+    def __init__(self, switch, ports=set(), modify=dict(), obs=set()):
         """
         ARGS:
             switch: switch on which the ports live
             ports: ports to which to forward packet
             modify: dictionary of header fields to values, fields that are set
                 will overwrite the packet's fields
+            obs: counters to increment when this action fires.
         """
         self.switch = switch
         self.ports = ports
         self.modify = modify
+        self.obs = obs
 
     def __str__(self):
         return "%s: %s -> %s" % (self.switch, self.modify, self.ports)
@@ -824,7 +826,11 @@ def nary_policy_union(policies):
         return sum(policies[1:], base)
 
 class PolicyRestriction(Policy):
-    """A policy restricted by a predicate."""
+    """A policy restricted by a predicate.
+    
+    Note that a reduced policy NEVER contains restrictions since they are
+    transformed into intersections.
+    """
     def __init__(self, policy, predicate):
         """
         ARGS:

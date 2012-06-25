@@ -36,7 +36,7 @@ import slicing
 import unittest
 
 a1 = Action(1, [1, 2, 3], {'srcmac':1})
-a2 = Action(2, [2, 3], {'dstmac':2})
+a2 = Action(2, [2, 3], {'dstmac':2}, set([1, 2, 3]))
 a3 = Action(3, [3], {'ethtype':3})
 a4 = Action(3, [4, 5, 6], {'srcip':4})
 a5 = Action(3, [3, 5, 6, 7], {'vlan':5})

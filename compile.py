@@ -118,7 +118,6 @@ def isolated_policy(policy, vlan):
     vlan_predicate = nc.Header({'vlan': vlan})
     return policy % vlan_predicate
 
-# TODO(astory): make sure this doesn't pick up vlan traffic.
 def external_predicate((switch, port), predicate):
     """Produce a predicate that matches predicate incoming on (switch, port).
 
@@ -163,11 +162,11 @@ def modify_vlan_local(policy, (switch, port), tag):
                 # Build new actions around these objects
                 out_modify = dict(action.modify)
                 out_modify['vlan'] = tag
-                out_a = nc.Action(switch, bad_ports, out_modify)
+                out_a = nc.Action(switch, bad_ports, out_modify, action.obs)
                 output_actions.append(out_a)
                 if len(good_ports) > 0:
                     output_actions.append(nc.Action(switch, good_ports,
-                                                    action.modify))
+                                                    action.modify, action.obs))
             else:
                 # No need to modify it
                 output_actions.append(action)
