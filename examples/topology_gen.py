@@ -46,16 +46,27 @@ of networkX's diverse set of graph generators.
 from nxtopo import NXTopo
 from nxtopo import from_graph
 
-def make_id(label, *indexes):
-    if len(indexes) == 0:
-        return label
-    else:
-        if label == '':
-            return '_'.join([str(i) for i in indexes])
-        else:
-            return label + '_' + '_'.join([str(i) for i in indexes])
+def make_id(label, *indexes, **kwargs):
+    """Generate an id beginning with label and following with indexes.
 
-def grid(m, n, diagonal=False, label='s'):
+    if num=True in kwargs, generate it as a number, keeping indexes separated by
+    powers of 10.  In that case, label must be a number
+    """
+    if 'num' in kwargs and kwargs['num']:
+        value = label
+        for i in indexes:
+            value = (value * 10) + i
+        return value
+    else:
+        if len(indexes) == 0:
+            return label
+        else:
+            if label == '':
+                return '_'.join([str(i) for i in indexes])
+            else:
+                return label + '_' + '_'.join([str(i) for i in indexes])
+
+def grid(m, n, diagonal=False, label='s', num=False):
     """Produce an m by n grid of nodes.
 
     Diagonal links are not included unles diagonal=True is set.
@@ -65,48 +76,51 @@ def grid(m, n, diagonal=False, label='s'):
     # add nodes
     for i in range(m):
         for j in range(n):
-            topo.add_switch(make_id(label, i, j))
+            topo.add_switch(make_id(label, i, j, num=num))
 
     # add links
     for i in range(m):
         for j in range(n):
             if i+1 < m:
-                topo.add_link(make_id(label, i, j), make_id(label, i+1, j))
+                topo.add_link(make_id(label, i, j, num=num),
+                              make_id(label, i+1, j, num=num))
             if j+1 < n:
-                topo.add_link(make_id(label, i, j), make_id(label, i, j+1))
+                topo.add_link(make_id(label, i, j, num=num),
+                              make_id(label, i, j+1, num=num))
             if diagonal:
                 if i+1 < m and j+1 < n:
-                    topo.add_link(make_id(label, i, j),
-                                  make_id(label, i+1, j+1))
+                    topo.add_link(make_id(label, i, j, num=num),
+                                  make_id(label, i+1, j+1, num=num))
                 if i-1 >= 0 and j+1 < n:
-                    topo.add_link(make_id(label, i, j),
-                                  make_id(label, i-1, j+1))
+                    topo.add_link(make_id(label, i, j, num=num),
+                                  make_id(label, i-1, j+1, num=num))
 
     return topo
 
-def torus2d(m, n, diagonal=False,label='s'):
+def torus2d(m, n, diagonal=False, label='s', num=False):
     """Produce an m by n 2d torus."""
-    topo = grid(m, n, diagonal=diagonal, label=label)
+    topo = grid(m, n, diagonal=diagonal, label=label, num=num)
     for i in range(m):
-        topo.add_link(make_id(label, i, 0), make_id(label, i, n-1))
+        topo.add_link(make_id(label, i, 0, num=num), make_id(label, i, n-1, num=num))
         if diagonal:
             for j in range(n):
-                topo.add_link(make_id(label, i, j),
-                              make_id(label, (i-1) % m, n-1))
-                topo.add_link(make_id(label, i, j),
-                              make_id(label, (i+1) % m, n-1))
+                topo.add_link(make_id(label, i, j, num=num),
+                              make_id(label, (i-1) % m, n-1), num=num)
+                topo.add_link(make_id(label, i, j, num=num),
+                              make_id(label, (i+1) % m, n-1), num=num)
 
     for j in range(n):
-        topo.add_link(make_id(label, 0, j), make_id(label, m-1, j))
+        topo.add_link(make_id(label, 0, j, num=num),
+                      make_id(label, m-1, j, num=num))
         if diagonal:
             for i in range(m):
-                topo.add_link(make_id(label, i, j),
-                              make_id(label, m-1, (j-1) % n))
-                topo.add_link(make_id(label, i, j),
-                              make_id(label, m-1, (j+1) % n))
+                topo.add_link(make_id(label, i, j, num=num),
+                              make_id(label, m-1, (j-1) % n, num=num))
+                topo.add_link(make_id(label, i, j, num=num),
+                              make_id(label, m-1, (j+1) % n, num=num))
     return topo
 
-def hierarchy(root, layers, bottom, hosts, label='s'):
+def hierarchy(root, layers, bottom, hosts, label='s', num=False):
     """Build a hierarchical fat tree.
 
     ARGS:
@@ -134,24 +148,24 @@ def hierarchy(root, layers, bottom, hosts, label='s'):
     if len(layers) > 0:
         layer = layers[0]
         next_layer = hierarchy_add_layer(topo, [], layer, layers[1:],
-                                         bottom, hosts, label=label)
+                                         bottom, hosts, label=label, num=num)
     else:
-        next_layer = hierarchy_bottom(topo, [0], bottom, hosts, label=label)
+        next_layer = hierarchy_bottom(topo, [0], bottom, hosts, label=label, num=num)
     for i in range(root):
-        s_id = make_id(label, i)
+        s_id = make_id(label, i, num=num)
         topo.add_switch(s_id)
         for s in next_layer:
             topo.add_link(s_id, s)
     return topo
 
-def hierarchy_add_layer(topo, groups,
-                        (ngroups, switches), layers, bottom, hosts, label='s'):
+def hierarchy_add_layer(topo, groups, (ngroups, switches),
+                        layers, bottom, hosts, label='s', num=False):
     layer_switches = set()
     for g in range(ngroups):
         group_switches = set()
         local_groups = groups + [g]
         for s in range(switches):
-            switch = make_id(label, *(local_groups + [s]))
+            switch = make_id(label, *(local_groups + [s]), num=num)
             group_switches.add(switch)
             if switch in topo.node:
                 print "%s already in topo!" % switch
@@ -162,33 +176,34 @@ def hierarchy_add_layer(topo, groups,
             next_layer = layers[0]
             next_switches = hierarchy_add_layer(topo, local_groups, next_layer,
                                                 layers[1:], bottom, hosts,
-                                                label=label)
+                                                label=label, num=num)
         else:
             # bottom of tree, make bottom switches
             next_switches = hierarchy_bottom(topo, local_groups + [0],
-                                             bottom, hosts, label=label)
+                                             bottom, hosts, label=label,
+                                             num=num)
         for g_s in group_switches:
             for n_s in next_switches:
                 topo.add_link(g_s, n_s)
     return layer_switches
 
-def hierarchy_bottom(topo, groups, bottom, hosts, label='s'):
+def hierarchy_bottom(topo, groups, bottom, hosts, label='s', num=False):
     switches = set()
     for s in range(bottom):
-        s_id = make_id(label, *(groups + [s]))
+        s_id = make_id(label, *(groups + [s]), num=num)
         switches.add(s_id)
         if s_id in topo.node:
             print "%s already in topo!" % s_id
         topo.add_switch(s_id)
-        hs = hierarchy_hosts(topo, groups + [s], hosts, label=label)
+        hs = hierarchy_hosts(topo, groups + [s], hosts, label=label, num=num)
         for h in hs:
             topo.add_link(s_id, h)
     return switches
 
-def hierarchy_hosts(topo, groups, hosts, label='s'):
+def hierarchy_hosts(topo, groups, hosts, label='s', num=False):
     hs = set()
     for h in range(hosts):
-        h_id = make_id(label, *(groups + [h]))
+        h_id = make_id(label, *(groups + [h]), num=num)
         hs.add(h_id)
-        topo.add_switch(h_id)
+        topo.add_host(h_id)
     return hs

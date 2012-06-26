@@ -79,6 +79,22 @@ def transform(combined, assigner=vl.sequential, verbose=False):
         a single Policy encapsulating the shared but isolated behavior of all
         the slices
     """
+    policy_list = compile_slices(combined, assigner=assigner, verbose=verbose)
+    return nc.nary_policy_union(policy_list)
+
+def compile_slices(combined, assigner=vl.sequential, verbose=False):
+    """Turn a set of slices sharing a physical topology into a single policy.
+    ARGS:
+        combined:  set of (slices, policies) (with the same physical topology) to
+            combine
+        assigner:  function to use to assign vlans to slices.  Must return a
+            {slice: vlan} dictionary, defaults to sequential.
+        verbose:  print out progress information
+
+    RETURNS:
+        a single Policy encapsulating the shared but isolated behavior of all
+        the slices
+    """
     slices = [s for (s, p) in combined]
     vlans = assigner(slices)
     policy_list = []
@@ -87,10 +103,13 @@ def transform(combined, assigner=vl.sequential, verbose=False):
         vlan = vlans[slic]
         # Produce a policy that only accepts packets within our vlan
         safe_policy = isolated_policy(policy, vlan)
+        safe_policy.get_physical_rep(slic.node_map, slic.port_map)
         # Produce a separate policy that adds vlan tags to safe incoming packets
         inport_policy = external_to_vlan_policy(slic, policy, vlan)
+        inport_policy.get_physical_rep(slic.node_map, slic.port_map)
         # Take their union
         safe_inport_policy = safe_policy + inport_policy
+        safe_inport_policy.get_physical_rep(slic.node_map, slic.port_map)
 
         # Modify the result to strip the vlan tag from outbound ports
         # Note that this should be the last step.  If our policy takes an
@@ -103,7 +122,7 @@ def transform(combined, assigner=vl.sequential, verbose=False):
         if verbose:
             print 'Processed %d slices.' % count
             count += 1
-    return nc.nary_policy_union(policy_list)
+    return policy_list
 
 def isolated_policy(policy, vlan):
     """Produce a policy for slic restricted to its vlan.
@@ -162,10 +181,11 @@ def modify_vlan_local(policy, (switch, port), tag):
                 # Build new actions around these objects
                 out_modify = dict(action.modify)
                 out_modify['vlan'] = tag
-                out_a = nc.Action(switch, bad_ports, out_modify, action.obs)
+                out_a = nc.Action(action.switch, bad_ports,
+                                  out_modify, action.obs)
                 output_actions.append(out_a)
                 if len(good_ports) > 0:
-                    output_actions.append(nc.Action(switch, good_ports,
+                    output_actions.append(nc.Action(action.switch, good_ports,
                                                     action.modify, action.obs))
             else:
                 # No need to modify it

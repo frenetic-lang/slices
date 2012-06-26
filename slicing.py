@@ -29,6 +29,7 @@
 # Data structure to represent virtual network slices                           #
 ################################################################################
 """Data structure to represent virtual network slices and related tools."""
+import util
 
 def is_injective(mapping):
     """Determine if a mapping is injective.
@@ -121,6 +122,12 @@ def assert_set_equals(set1, set2):
 
     for entry in set1:
         assert entry in set2, err % str(entry)
+
+def ident_map_slice(topo, edge_policy, map_end_hosts=False):
+    """Build a slice using topo as both the physical and logical topology."""
+    node_map = util.id_map(topo.nodes() if map_end_hosts else topo.switches())
+    port_map = util.id_map(util.ports_of_topo(topo))
+    return Slice(topo, topo, node_map, port_map, edge_policy, map_end_hosts)
   
 class Slice:
     """Data structure to represent virtual network slices."""

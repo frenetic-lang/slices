@@ -36,18 +36,20 @@ def from_graph(graph, data=False):
     """Convert another NetworkX graph to an nxtopo.
 
     Marks all nodes as switches.  Copies extra data in the nodes if data=True.
+    Leaves graph unfinalized.
     """
     topo = NXTopo()
     if data:
         for node, data in graph.nodes(data=True):
             topo.add_switch(node, data)
-        for n1, n2, data in graph.edge(data=True):
+        for n1, n2, data in graph.edges(data=True):
             topo.add_edge(n1, n2, data)
     else:
         for node in graph.nodes():
             topo.add_switch(node)
-        for n1, n2 in graph.edge():
+        for n1, n2 in graph.edges():
             topo.add_edge(n1, n2)
+    return topo
 
 class NXTopo(nx.Graph):
     """Representation of network switches.

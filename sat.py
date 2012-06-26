@@ -33,7 +33,8 @@
 No observations yet.
 """
 
-from z3.z3 import And, Or, Not, Function, DeclareSort, Solver, Consts
+from z3.z3 import And, Or, Not, Function, DeclareSort, IntSort
+from z3.z3 import Consts, Solver, unsat
 from netcore import HEADERS
 import netcore as nc
 
@@ -85,24 +86,31 @@ def match_of_predicate(pred, pkt):
         return And(left, Not(right))
 
 # TODO(astory): observations
-def modify_packet(action, pkt):
-    """Build the constraint for action producing pkt."""
+def modify_packet(action, p_in, p_out):
+    """Build the constraint for action producing p_out from p_in."""
     ports = action.ports
     modify = action.modify
     obs = action.obs
 
     constraints = []
-    constraints.append(HEADER_INDEX['switch'](pkt) == action.switch)
+    constraints.append(HEADER_INDEX['switch'](p_out) == action.switch)
 
     port_constraints = []
     for p in ports:
-        port_constraints.append(HEADER_INDEX['port'](pkt) == p)
+        port_constraints.append(HEADER_INDEX['port'](p_out) == p)
     # Note that if there are no ports, port_constraints is empty, so we get
     # False back:  drop the packet, no packet can match.
     constraints.append(nary_or(port_constraints))
 
-    for field, value in modify.items():
-        constraints.append(HEADER_INDEX[field](pkt) == value)
+    for h in HEADERS:
+        if h is not 'switch' and h is not 'port':
+            # If a h is not modified, it must remain constant across both
+            # packets.
+            if h not in modify:
+                constraints.append(HEADER_INDEX[h](p_in) ==
+                                   HEADER_INDEX[h](p_out))
+            else:
+                constraints.append(HEADER_INDEX[h](p_out) == modify[h])
 
     # We add at least two constraints, so constraints is never empty.
     return nary_and(constraints)
@@ -116,7 +124,9 @@ def match_of_policy(policy, p_in, p_out):
     elif isinstance(policy, nc.PrimitivePolicy):
         pred = policy.predicate
         actions = policy.actions
-        action_constraints = nary_or([modify_packet(a, p_out) for a in actions])
+        # If the predicate matches, any one of the actions may fire.
+        action_constraints = nary_or([modify_packet(a, p_in, p_out)
+                                      for a in actions])
         # Use and here rather than implies because if the input packet doesn't
         # match, we don't want the rule to fire - without this, we can get
         # really weird behavior if the predicate is false over a packet, since
@@ -127,7 +137,7 @@ def match_of_policy(policy, p_in, p_out):
         right = policy.right
         return Or(match_of_policy(left, p_in, p_out),
                   match_of_policy(right, p_in, p_out))
-    elif isinstance(policy, PolicyRestriction):
+    elif isinstance(policy, nc.PolicyRestriction):
         subpolicy = policy.policy
         pred = policy.predicate
         return And(match_of_policy(subpolicy, p_in, p_out),
@@ -151,9 +161,59 @@ def transfer(topo, p_out, p_in):
                               HEADER_INDEX['port'](p_in) == p1))
         options.append(constraint1)
         options.append(constraint2)
-    return nary_or(options)
+    forward = nary_or(options)
+
+    # We also need to ensure that the rest of the packet is the same.  Without
+    # this, packet properties can change in flight.
+    header_constraints = []
+    for f in HEADERS:
+        if f is not 'switch' and f is not 'port':
+            header_constraints.append(
+                    HEADER_INDEX[f](p_out) == HEADER_INDEX[f](p_in))
+    # header_constraints is never empty
+    return And(forward, nary_and(header_constraints))
 
 def isolated(topo, policy1, policy2):
+    """Determine if policy1 is isolated from policy2.
+    
+    RETURNS: True or False
+    """
+    return isolated_model(topo, policy1, policy2) is None
+
+def isolated_diagnostic(topo, policy1, policy2):
+    """Determine if policy1 is isolated from policy2.
+
+    RETURNS: The empty string if they are isolated, or a diagnostic string
+        detailing what packets will break isolation if they are not.
+    """
+
+    solution = isolated_model(topo, policy1, policy2)
+    if solution is None:
+        return ''
+    else:
+        (model, (p1, p2, p3, p4), hs) = solution
+        properties = {}
+        for p in (p1, p2, p3, p4):
+            properties[str(p)] = {}
+            for f, v in hs.items():
+                prop = model.evaluate(v(p))
+                # This is dirty, but this seems to be the only way to tell if
+                # this value is determined or not
+                if 'as_long' in dir(prop):
+                    properties[str(p)][f] = prop.as_long()
+                else: # Value not determined
+                    pass
+    return ('%s\n'
+            '---policy1--->\n'
+            '%s\n'
+            '---topology-->\n'
+            '%s\n'
+            '---policy2--->\n'
+            '%s'
+            % (properties[str(p1)], properties[str(p2)],
+               properties[str(p3)], properties[str(p4)]))
+
+def isolated_model(topo, policy1, policy2):
     """Determine if policy1 can produce a packet that goes to policy2.
 
     RETURNS: None if the policies are isolated
