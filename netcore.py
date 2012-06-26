@@ -28,7 +28,47 @@
 # /updates/netcore.py                                                          #
 # Netcore grammar objects and related functions                                #
 ################################################################################
-"""Netcore grammar objects and related functions."""
+"""Netcore grammar objects and related functions.
+
+For convenience, here's the grammar:
+
+Switch s
+
+Observation obs
+
+Port t      ::= int
+
+Field f     ::= switch
+              | port
+              | srcmac
+              | dstmac
+              | ethtype
+              | srcip
+              | dstip
+              | vlan
+              | protocol
+              | srcport
+              | dstport
+
+Value v     ::= int
+
+Predicate d ::= Top
+              | Bottom
+              | Header({f: v})
+   d1 + d2    | Union(d1, d2)
+   d1 & d2    | Intersection(d1, d2)
+   d1 - d2    | Difference(d1, d2)
+
+Action a    ::= Action(s, p Set, {f: v}, obs)
+
+Policy p    ::= BottomPolicy
+  d |then| a  | PrimitivePolicy(d, a)
+  p1 + p2     | PolicyUnion(p1, p2)
+  p % d       | PolicyRestriction(p, d)
+
+PolicyRestriction objects are never found in policies that have been reduced by
+policy.reduce().
+"""
 
 from abc import ABCMeta, abstractmethod
 import copy
@@ -155,18 +195,19 @@ class Bottom(Predicate):
     def __eq__(self, other):
         return isinstance(other, Bottom)
 
-
-HEADER_FIELDS = set (['switch',
-                      'port',
-                      'srcmac',
-                      'dstmac',
-                      'ethtype',
-                      'srcip',
-                      'dstip',
-                      'vlan',
-                      'protocol',
-                      'srcport',
-                      'dstport'])
+# Two constants, one for quick lookups, one to have a canonical ordering.
+HEADERS = ['switch',
+           'port',
+           'srcmac',
+           'dstmac',
+           'ethtype',
+           'srcip',
+           'dstip',
+           'vlan',
+           'protocol',
+           'srcport',
+           'dstport']
+HEADER_FIELDS = set (HEADERS)
 
 def inport(switch, ports):
     """Construct a predicate accepting packets on one or a list of ports."""
@@ -219,7 +260,6 @@ class Header(Predicate):
         field: header field to match pattern against
         pattern: value to match.
         """
-        self.fields = {}
         self.fields = fields
 
     def __str__(self):
