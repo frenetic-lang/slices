@@ -85,6 +85,25 @@ class TestSlicing(unittest.TestCase):
         result = sat.isolated(topo, policies[0], policies[1])
         self.assertTrue(result)
 
+    def testCompleteGraphPhysEquiv(self):
+        topo, combined = k10()
+        policies = [p for _, p in combined]
+
+        for i in range(0, len(policies)):
+            for j in range(len(policies)):
+                print "testing %s equiv %s." % (k10_nodes[i], k10_nodes[j])
+                result = sat.equivalent(policies[i],
+                                        nc.PolicyUnion(policies[i],
+                                                       policies[j]))
+                if i is not j and\
+                   len(set(k10_nodes[i]).intersection(k10_nodes[j])) > 1:
+                    self.assertIsNotNone(result)
+                else:
+                    equiv = sat.equivalent(policies[i],
+                                           nc.PolicyUnion(policies[i],
+                                                          policies[j]))
+                    self.assertIsNone(result)
+
     @unittest.skip("expensive")
     def testCompleteGraphPhysSep(self):
         topo, combined = k10()

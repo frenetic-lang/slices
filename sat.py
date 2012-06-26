@@ -33,7 +33,7 @@
 No observations yet.
 """
 
-from z3.z3 import And, Or, Not, Function, DeclareSort, IntSort
+from z3.z3 import And, Or, Not, Implies, Function, DeclareSort, IntSort
 from z3.z3 import Consts, Solver, unsat
 from netcore import HEADERS
 import netcore as nc
@@ -142,6 +142,8 @@ def match_of_policy(policy, p_in, p_out):
         pred = policy.predicate
         return And(match_of_policy(subpolicy, p_in, p_out),
                    match_of_predicate(pred, p_in))
+    else:
+        raise Exception('unknown policy type: %s' % policy.__class__)
 
 def transfer(topo, p_out, p_in):
     """Build constraint for moving p_out to p_in across an edge."""
@@ -173,9 +175,52 @@ def transfer(topo, p_out, p_in):
     # header_constraints is never empty
     return And(forward, nary_and(header_constraints))
 
+def explain(model, packet, headers):
+    """Build {field: value} from model, packet and {field: function}."""
+    properties = {}
+    for f, v in headers.items():
+        prop = model.evaluate(v(packet))
+        # This is dirty, but this seems to be the only way to tell if
+        # this value is determined or not
+        if 'as_long' in dir(prop):
+            properties[f] = int(prop.as_long())
+        else: # Value not determined
+            pass
+    return properties
+
+def equivalent(policy1, policy2):
+    """Determine if policy1 is equivalent to policy2 under equality.
+
+    Note that this is unidirectional, it only asks if the packets that can go
+    into policy1 behave the same under policy1 as they do under policy2.
+    """
+    p1_in, p1_out = Consts('p1_in p1_out', Packet)
+    p2_in, p2_out1, p2_out2 = Consts('p2_in p2_out1 p2_out2', Packet)
+    s = Solver()
+    # There are two components to this.  First, we want to ensure that if p1
+    # forwards a packet, p2 also forwards it
+    constraint = Implies(match_of_policy(policy1, p1_in, p1_out),
+                         match_of_policy(policy2, p1_in, p1_out))
+    # Second, we want to ensure that if p2 forwards a packet, and it's a packet
+    # that p1 can forward, that p2 only forwards it in ways that p1 does.
+    constraint = And(constraint,
+                     Implies(And(match_of_policy(policy2, p2_in, p2_out1),
+                                 match_of_policy(policy1, p2_in, p2_out2)),
+                             match_of_policy(policy1, p2_in, p2_out1)))
+    # We want to check for emptiness, so our model gives us a packet back
+    s.add(Not(constraint))
+
+    if s.check() == unsat:
+        return None
+    else:
+#       explanations = [str(explain(s.model(), p, HEADER_INDEX))
+#                       for p in (p1_in, p1_out, p2_in, p2_out1, p2_out2)]
+        return (s.model(), (p1_in, p1_out, p2_in, p2_out1, p2_out2),
+                HEADER_INDEX)
+
 def isolated(topo, policy1, policy2):
     """Determine if policy1 is isolated from policy2.
-    
+
     RETURNS: True or False
     """
     return isolated_model(topo, policy1, policy2) is None
@@ -194,15 +239,7 @@ def isolated_diagnostic(topo, policy1, policy2):
         (model, (p1, p2, p3, p4), hs) = solution
         properties = {}
         for p in (p1, p2, p3, p4):
-            properties[str(p)] = {}
-            for f, v in hs.items():
-                prop = model.evaluate(v(p))
-                # This is dirty, but this seems to be the only way to tell if
-                # this value is determined or not
-                if 'as_long' in dir(prop):
-                    properties[str(p)][f] = prop.as_long()
-                else: # Value not determined
-                    pass
+            properties[p] = explain(model, p, hs)
     return ('%s\n'
             '---policy1--->\n'
             '%s\n'
