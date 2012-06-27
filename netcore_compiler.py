@@ -221,7 +221,7 @@ def compile_predicate_header(switch, header):
         sw = fields['switch']
         switchMatches = (sw == switch)
     else:
-        switchMatches = 2
+        switchMatches = True
     d = translate_fields(fields)
     if len(d) > 0:
         return [Bone(d, switchMatches), Bone({}, False)]
