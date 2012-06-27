@@ -32,15 +32,21 @@
 
 from netcore import forward, inport, nary_policy_union, then
 
-def flood(topo):
-    """Construct a policy that floods packets out each port on each switch."""
+def flood(topo, all_ports=False):
+    """Construct a policy that floods packets out each port on each switch.
+
+    if all_ports is set, even forward back out the port it came in.
+    """
     switches = topo.switches()
     policies = []
     for switch in switches:
         ports = set(topo.node[switch]['port'].keys())
         for port in ports:
             # Make a copy of ports without this one
-            other_ports = ports.difference([port])
+            if all_ports:
+                other_ports = ports
+            else:
+                other_ports = ports.difference([port])
             for other_port in other_ports:
                 pol = inport(switch, port) |then| forward(switch, other_port)
                 policies.append(pol)

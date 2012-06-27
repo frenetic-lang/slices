@@ -25,72 +25,67 @@
 # LICENSE file distributed with this work for specific language governing      #
 # permissions and limitations under the License.                               #
 ################################################################################
-# /updates/compile_test.py                                                     #
-# Tests for compile.py, which implements the slice compiler                    #
+# /slices/edge_compile_test.py                                                 #
+# Tests for edge_compile.py, which implements the slice compiler               #
 ################################################################################
-import compile as cp
-import copy
-import netcore as nc
-from netcore import Action, inport, Header, then
-import slicing
+
+import compile_test as ct
+import examples.triangle as tri
+import edge_compile as ec
 import unittest
 
-a1 = Action(1, [1, 2, 3], {'srcmac':1})
-a2 = Action(2, [2, 3], {'dstmac':2}, set([1, 2, 3]))
-a3 = Action(3, [3], {'ethtype':3})
-a4 = Action(3, [4, 5, 6], {'srcip':4})
-a5 = Action(3, [3, 5, 6, 7], {'vlan':5})
+topo, slices = tri.get_slices()
 
-p1 = inport(1, 0)
-p2 = inport(2, 1) + inport(2, 3)
-p3 = inport(3, 3) & Header({'srcmac': 1})
-p4 = p3 - Header({'dstmac': 2})
+class TestEdgeCompile(unittest.TestCase):
+    def test_edge_of_port(self):
+        s1 = 'PI1'
+        s2 = 'PI2'
+        p1 = topo.node[s1]['ports'][s2]
+        p2 = topo.node[s2]['ports'][s1]
 
-l1 = p1 |then| a1
-l2 = p2 |then| a2
-l3 = p3 |then| a3
-l4 = p4 |then| a4
-l5 = (p1 & p4) |then| a5
+        out = ec.edge_of_port(topo, (s1, p1))
 
-big_policy = ((l3 + l4 + l5) % p2) + l2 + l1
+        self.assertEqual(((s1, p1), (s2, p2)), out)
 
-def actions_of_policy(policy):
-    if isinstance(policy, nc.PrimitivePolicy):
-        return policy.actions
-    elif isinstance(policy, nc.PolicyUnion):
-        return actions_of_policy(policy.left) + actions_of_policy(policy.right)
-    else: # isinstance(policy, nc.PolicyRestriction)
-        return actions_of_policy(policy.policy)
+        s1 = 'PE1'
+        s2 = 'GH1'
+        p1 = topo.node[s1]['ports'][s2]
+        p2 = topo.node[s2]['ports'][s1]
 
-def action_to_microactions(action):
-    switch = action.switch
-    modify = action.modify
-    return [Action(switch, [p], copy.copy(modify)) for p in action.ports]
+        out = ec.edge_of_port(topo, (s1, p1))
 
-def flatten(l):
-    """An opaque way to flatten a list."""
-    return [item for sublist in l for item in sublist]
+        self.assertEqual(((s1, p1), (s2, p2)), out)
 
-class TestCompile(unittest.TestCase):
-    def test_modify_vlan(self):
-        modified = cp.modify_vlan(big_policy, -1)
-        for action in actions_of_policy(modified):
-            self.assertDictContainsSubset({'vlan': -1}, action.modify)
+    def test_symmetric_edge(self):
+        sources = range(0,99)
+        sinks = range(100, 199)
+        edges = zip(sources, sinks)
+        vlans = range(200,299)
+        d = dict(zip(edges, vlans))
+        # Test already-symmetric case
+        d[(1000, 1000)] = 1000
+        symm = ec.symmetric_edge(d)
+        self.assertIsNot(d, symm)
+        items = sorted(symm.items())
+        for (s1, s2), vlan in d.items():
+            self.assertIn(((s1, s2), vlan), items)
+            self.assertIn(((s2, s1), vlan), items)
 
-    def test_strip_vlan(self):
-        # Test by expanding to actions that only handle one port at a time, and
-        # verifying from there.
-        micro = flatten([action_to_microactions(a)
-                         for a in actions_of_policy(big_policy)])
-        for action in micro:
-            if action.switch == 3 and action.ports == [3]:
-                action.modify['vlan'] = 0
-        modified = cp.strip_vlan(big_policy, (3, 3))
+    def test_get_slice_lookup(self):
+        edges = range(0,100)
+        slices = range(70, 170)
+        tags = range(150, 250)
+        d = {}
+        for e in edges:
+            d[e] = {}
+            for s, t in zip(slices, tags):
+                d[e][s] = t
+        out = ec.get_slice_lookup(d)
 
-        modified_micro = flatten([action_to_microactions(a)
-                                  for a in actions_of_policy(modified)])
-
-        self.assertItemsEqual(micro, modified_micro)
+        self.assertIsNot(d, out)
+        for e, slices in d.items():
+            for s, t in slices.items():
+                self.assertEqual(t, out[s][e])
 
 if __name__ == '__main__':
     unittest.main()

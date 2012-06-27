@@ -55,9 +55,9 @@ def blue_slice(p_topo):
 
         for ep in l_topo.edge_ports(s):
             if i == 2:
-                preds[(s,ep)] = nc.Header("srcport", 80) #TODO define
+                preds[(s,ep)] = nc.Header({"srcport": 80}) #TODO define
             else:
-                preds[(s,ep)] = nc.Header("dstport", 80)
+                preds[(s,ep)] = nc.Header({"dstport": 80})
 
     return slicing.Slice(l_topo, p_topo, s_map, p_map, preds,
                          map_end_hosts=True)
@@ -113,9 +113,9 @@ def red_slice(p_topo):
 
         for ep in l_topo.edge_ports(s):
             if i == 1:
-                preds[(s,ep)] = nc.Header("srcport", 80)
+                preds[(s,ep)] = nc.Header({"srcport": 80})
             else:
-                preds[(s,ep)] = nc.Header("dstport", 80)
+                preds[(s,ep)] = nc.Header({"dstport": 80})
 
     return slicing.Slice(l_topo, p_topo, s_map, p_map, preds,
                          map_end_hosts=True)

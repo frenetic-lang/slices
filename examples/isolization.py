@@ -62,8 +62,8 @@ def test_1():
     # Build a netcore policy
     switch = 1
     pol = PolicyUnion(
-            PrimitivePolicy(Header('loc', (switch, 2)), [Action(1, [1], {'VLAN' : 1})]),
-            PrimitivePolicy(Header('loc', (switch, 1)), [Action(1, [1], {'VLAN' : 0})]))
+            PrimitivePolicy(Header({'loc': (switch, 2)}), [Action(1, [1], {'VLAN' : 1})]),
+            PrimitivePolicy(Header(['loc': (switch, 1)}), [Action(1, [1], {'VLAN' : 0})]))
 
     networkConfig = netcore_compiler.compile(FakeNX([switch]), pol)
     send_signal("In main:\n%s\n" % networkConfig)
@@ -87,10 +87,10 @@ def netcore_shortest_path(graph):
                     outport = graph.node[curr]['ports'][next]
                     assert(isinstance(inport, type(0)))
                     assert(isinstance(curr, type(0)))
-                    headers = [Header('loc', (curr, inport)),
-                               Header('ethtype', 0x800),
-                               Header('srcip', ip(src)), 
-                               Header('dstip', ip(dst))]
+                    headers = [Header({'loc': (curr, inport)}),
+                               Header({'ethtype': 0x800}),
+                               Header({'srcip': ip(src)}), 
+                               Header({'dstip': ip(dst)})]
                     pol = PrimitivePolicy(nary_intersection(headers), 
                                           [Action(curr, [outport], {})])
                     raw.append(pol)
