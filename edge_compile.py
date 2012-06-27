@@ -57,6 +57,14 @@ def transform(topo, slices, assigner=vl.edge_optimal, verbose=False):
         a single Policy encapsulating the shared but isolated behavior of all
         the slices
     """
+    policy_list = compile_slices(topo, slices, assigner, verbose)
+    return nc.nary_policy_union(policy_list)
+
+def compile_slices(topo, slices, assigner=vl.edge_optimal, verbose=False):
+    """Turn a set of slices sharing a physical topology into a list of policies.
+
+    See transform for more documentation.
+    """
     slice_only = [s for (s, p) in slices]
     if verbose:
         import sys
@@ -65,6 +73,8 @@ def transform(topo, slices, assigner=vl.edge_optimal, verbose=False):
     slice_lookup = get_slice_lookup(vlans)
     if verbose:
         print 'done.'
+        for i in range(len(slice_lookup)):
+            print '%d: %s' % (i, slice_lookup[slice_only[i]])
         print 'Compiling slices...',
     policy_list = []
     count = 0
@@ -75,7 +85,7 @@ def transform(topo, slices, assigner=vl.edge_optimal, verbose=False):
         policies = [p.get_physical_rep(slic.node_map, slic.port_map)
                     for p in internal_p + external_p]
         policies = [p for p in policies if not isinstance(p, nc.BottomPolicy)]
-        policy_list.extend(policies)
+        policy_list.append(nc.nary_policy_union(policies))
         if verbose:
             count += 1
             print '.',
@@ -83,7 +93,7 @@ def transform(topo, slices, assigner=vl.edge_optimal, verbose=False):
     if verbose:
         print 'done.'
         print '%d policies generated.' % len(policy_list)
-    return nc.nary_policy_union(policy_list)
+    return policy_list
 
 def edge_of_port(topo, (switch, port)):
     """Return the edge that port traverses in topo.
@@ -113,7 +123,9 @@ def get_slice_lookup(edge_lookup):
             output[slic][edge] = tag
     return output
 
-# TODO(astory): don't set the vlan tag if it's already what we want it to be
+# TODO(astory): don't set the vlan tag if it's already what we want it to be.
+# But do this carefully.  We still need to completely remove forwards to ports
+# that aren't under consideration at the moment.
 def internal_policy(topo, policy, symm_vlan):
     """Produce a list of policies for slic restricted to its vlan.
 
@@ -129,20 +141,32 @@ def internal_policy(topo, policy, symm_vlan):
     RETURNS:
         a new policy object that is policy but restricted to its vlan.
     """
+
+#    print '========================='
+#    print '========================='
+#    print policy
+#    print '----'
     policies = []
     # incoming edge to s1.  Note that we only get internal edges
     for ((s1, p1), (s2, p2)), tag in symm_vlan.items():
         if s1 in topo.node:
-            pred = nc.inport(s1, p1) & nc.Header({'vlan': tag})
+            pred = (nc.inport(s1, p1) & nc.Header({'vlan': tag})).reduce()
             # For each outgoing edge from s1, set vlan to what's appropriate
             for (p_out, dst) in topo.node[s1]['port'].items():
                 if ((s1, p_out), dst) in symm_vlan:
                     target_vlan = symm_vlan[((s1, p_out), dst)]
                 else:
                     target_vlan = 0
+#                print '%s:%s on %s -> %s on %s' % (s1, p1, tag, p_out, target_vlan)
+#                print 'restrict with %s' % pred
                 new_policy = (policy % pred).reduce()
+#                print new_policy
                 new_policy = modify_vlan_local(new_policy, (s1, p_out),
-                                          target_vlan)
+                                               target_vlan, this_port_only=True)
+                new_policy = new_policy.reduce()
+#                print 'vvv'
+#                print new_policy
+#                print '----'
                 # modify_vlan_local does not create any new reduceables
                 policies.append(new_policy)
     return policies

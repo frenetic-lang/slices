@@ -59,6 +59,7 @@ def nary_and(constraints):
         return constraints[0]
     else:
         return And(constraints[0], nary_and(constraints[1:]))
+
 def match_of_predicate(pred, pkt):
     """Build the constraint for pred on pkt."""
     if isinstance(pred, nc.Top):
@@ -239,7 +240,7 @@ def isolated_diagnostic(topo, policy1, policy2):
         (model, (p1, p2, p3, p4), hs) = solution
         properties = {}
         for p in (p1, p2, p3, p4):
-            properties[p] = explain(model, p, hs)
+            properties[str(p)] = explain(model, p, hs)
     return ('%s\n'
             '---policy1--->\n'
             '%s\n'

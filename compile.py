@@ -83,17 +83,9 @@ def transform(combined, assigner=vl.sequential, verbose=False):
     return nc.nary_policy_union(policy_list)
 
 def compile_slices(combined, assigner=vl.sequential, verbose=False):
-    """Turn a set of slices sharing a physical topology into a single policy.
-    ARGS:
-        combined:  set of (slices, policies) (with the same physical topology) to
-            combine
-        assigner:  function to use to assign vlans to slices.  Must return a
-            {slice: vlan} dictionary, defaults to sequential.
-        verbose:  print out progress information
+    """Turn a set of slices sharing a physical topology into a list of policies.
 
-    RETURNS:
-        a single Policy encapsulating the shared but isolated behavior of all
-        the slices
+    See transform for more documentation.
     """
     slices = [s for (s, p) in combined]
     vlans = assigner(slices)
@@ -164,8 +156,11 @@ def modify_vlan(policy, vlan):
         new_policy = modify_vlan(policy.policy, vlan)
         return new_policy % policy.predicate
 
-def modify_vlan_local(policy, (switch, port), tag):
+def modify_vlan_local(policy, (switch, port), tag, this_port_only=False):
     """Re-write all actions of policy to set vlan to tag on switch, port.
+
+    if this_port_only, ONLY include actions that forward to the target output
+    port.
 
     Non-destructive, returns an entirely new object.
     """
@@ -184,19 +179,26 @@ def modify_vlan_local(policy, (switch, port), tag):
                 out_a = nc.Action(action.switch, bad_ports,
                                   out_modify, action.obs)
                 output_actions.append(out_a)
-                if len(good_ports) > 0:
+                if len(good_ports) > 0 and not this_port_only:
                     output_actions.append(nc.Action(action.switch, good_ports,
                                                     action.modify, action.obs))
             else:
                 # No need to modify it
-                output_actions.append(action)
+                # If we don't want other ports, however, drop it.
+                if this_port_only:
+                    pass
+                else:
+                    output_actions.append(action)
         return policy.predicate |then| output_actions
     elif isinstance(policy, nc.PolicyUnion):
-        left = modify_vlan_local(policy.left, (switch, port), tag)
-        right = modify_vlan_local(policy.right, (switch, port), tag)
+        left = modify_vlan_local(policy.left, (switch, port), tag,
+                                 this_port_only)
+        right = modify_vlan_local(policy.right, (switch, port), tag,
+                                  this_port_only)
         return left + right
     elif isinstance(policy, nc.PolicyRestriction):
-        new_policy = modify_vlan_local(policy.policy, (switch, port), tag)
+        new_policy = modify_vlan_local(policy.policy, (switch, port), tag,
+                                       this_port_only)
         return new_policy % policy.predicate
     elif isinstance(policy, nc.BottomPolicy):
         return policy

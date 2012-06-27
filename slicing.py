@@ -128,7 +128,7 @@ def ident_map_slice(topo, edge_policy, map_end_hosts=False):
     node_map = util.id_map(topo.nodes() if map_end_hosts else topo.switches())
     port_map = util.id_map(util.ports_of_topo(topo))
     return Slice(topo, topo, node_map, port_map, edge_policy, map_end_hosts)
-  
+
 class Slice:
     """Data structure to represent virtual network slices."""
     def __init__(self, logical_topology, physical_topology, node_map, port_map,
@@ -181,7 +181,7 @@ class Slice:
                 if port != 0 or self.map_end_hosts:
                     ports.add((switch, port))
 
-        assert_set_equals(switches, 
+        assert_set_equals(switches,
                           set(self.node_map.keys()))
         assert_set_equals(ports, set(self.port_map.keys()))
         assert_is_injective(self.node_map)

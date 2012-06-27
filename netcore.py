@@ -73,6 +73,20 @@ policy.reduce().
 from abc import ABCMeta, abstractmethod
 import copy
 
+# Two constants, one for quick lookups, one to have a canonical ordering.
+HEADERS = ['switch',
+           'port',
+           'srcmac',
+           'dstmac',
+           'ethtype',
+           'srcip',
+           'dstip',
+           'vlan',
+           'protocol',
+           'srcport',
+           'dstport']
+HEADER_FIELDS = set (HEADERS)
+
 class Infix:
     """Class to define infix operators like |so|."""
     def __init__(self, function):
@@ -194,20 +208,6 @@ class Bottom(Predicate):
 
     def __eq__(self, other):
         return isinstance(other, Bottom)
-
-# Two constants, one for quick lookups, one to have a canonical ordering.
-HEADERS = ['switch',
-           'port',
-           'srcmac',
-           'dstmac',
-           'ethtype',
-           'srcip',
-           'dstip',
-           'vlan',
-           'protocol',
-           'srcport',
-           'dstport']
-HEADER_FIELDS = set (HEADERS)
 
 def inport(switch, ports):
     """Construct a predicate accepting packets on one or a list of ports."""
@@ -671,7 +671,7 @@ class Policy:
         counterparts
         """
         pass
-    
+
     def __repr__(self):
         return self.__str__()
 
@@ -712,7 +712,7 @@ class BottomPolicy(Policy):
         return True
 
     def restrict(self, predicate):
-        return Bottom()
+        return BottomPolicy()
 
     def __str__(self):
         return "BottomPolicy"
@@ -722,7 +722,7 @@ class BottomPolicy(Policy):
 
 def make_policy(predicate, action):
     """Construct a policy with one or more actions.
-    
+
     Auto-converts action to a list if it is a solitary action.  Otherwise, pass
     whatever we got, and deal with the potential consequences.
     """
@@ -739,7 +739,7 @@ class PrimitivePolicy(Policy):
         """
         ARGS:
             predicate: predicate under which to apply action
-            actions: a list of Actions to apply to packets which match 
+            actions: a list of Actions to apply to packets which match
                 predicate.  Each action is applied to such a
                 packet, first effecting any modifications in the action, then
                 forwarding out any given ports, before applying the next
@@ -757,6 +757,8 @@ class PrimitivePolicy(Policy):
             self.actions == other.actions
 
     def reduce(self):
+        if len(self.actions) == 0:
+            return BottomPolicy()
         r_pred = self.predicate.reduce()
         if r_pred.is_bottom():
             return BottomPolicy()
@@ -867,7 +869,7 @@ def nary_policy_union(policies):
 
 class PolicyRestriction(Policy):
     """A policy restricted by a predicate.
-    
+
     Note that a reduced policy NEVER contains restrictions since they are
     transformed into intersections.
     """
