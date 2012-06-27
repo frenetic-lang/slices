@@ -219,6 +219,97 @@ def equivalent(policy1, policy2):
         return (s.model(), (p1_in, p1_out, p2_in, p2_out1, p2_out2),
                 HEADER_INDEX)
 
+def forwards(policy):
+    """Determine if there are any packets that the policy forwards.
+
+    RETURNS:
+        None if not forwardable.
+        (model, (p_in, p_out), HEADERS) if forwardable.
+    """
+    p_in, p_out = Consts('p_in p_out', Packet)
+    s = Solver()
+    s.add(match_of_policy(policy, p_in, p_out))
+    if s.check() == unsat:
+        return None
+    else:
+        return (s.model(), (p_in, p_out), HEADER_INDEX)
+
+def equiv_modulo(fields, p1, p2):
+    """Return a predicate testing if p1 and p2 are equivalent up to fields."""
+    constraints = []
+    for h in Headers:
+        if h not in fields:
+            constraints.append(HEADER_INDEX[h](p1) == HEADER_INDEX[h](p2))
+
+    return nary_and(constraints) if len(constraints) > 0 else True
+
+def compiled_correctly(orig, result):
+    """Determine if result is a valid compilation of orig.
+
+    Performs the following tests:
+    O is the original policy
+    R is the resulting policy
+    ~vl~ means equivalent up to vlans
+
+    No new behaviors:
+    p -R-> p' /\ p ~vl~ q /\ p' ~vl~ q' => q -O-> q'
+
+    No lost behaviors:
+    p -O-> p' /\ vlan(p) = 0 /\ p ~vl~ q /\ p' ~vl~ q' => q -R-> q'
+
+    RETURNS: True or False.  For models and diagnostics use no_new_behaviors and
+    no_lost_behaviors.
+    """
+    return (no_new_behaviors(orig, result) is None and
+            no_lost_behaviors(orig, result) is None)
+
+def no_new_behaviors(orig, result):
+    """Determine if result does not introduce any new forwarding options.
+
+    O is the original policy
+    R is the resulting policy
+    ~vl~ means equivalent up to vlans
+
+    Tests:
+    p -R-> p' /\ p ~vl~ q /\ p' ~vl~ q' => q -O-> q'
+
+    RETURNS: None or (model, (p, p', q, q'), HEADERS)
+    """
+    p, pp, q, qq = Consts('p pp q qq', Packet)
+    s = Solver()
+    s.add(Not(Implies(And(match_of_policy(result, p, pp),
+                          And(equiv_modulo(['vlan'], p, q),
+                              equiv_modulo(['vlan'], p, q))),
+                      match_of_policy(orig, q, qq))))
+    if s.check() == unsat:
+        return None
+    else:
+        (s.model(), (p, pp, q, qq), HEADER_INDEX)
+
+def no_lost_behaviors(orig, result):
+    """Determine if result does not lose any forwarding options.
+
+    O is the original policy
+    R is the resulting policy
+    ~vl~ means equivalent up to vlans
+
+    Tests:
+    p -O-> p' /\ vlan(p) = 0 /\ p ~vl~ q /\ p' ~vl~ q' => q -R-> q'
+
+    RETURNS: None or (model, (p, p', q, q'), HEADERS)
+    """
+    p, pp, q, qq = Consts('p pp q qq', Packet)
+    s = Solver()
+    s.add(Not(Implies(And(And(match_of_policy(orig, p, pp),
+                              HEADER_INDEX['vlan'](p) == 0),
+                          And(equiv_modulo(['vlan'](p, q)),
+                              equiv_modulo(['vlan'](pp, qq)))),
+                      match_of_policy(result, q, qq))))
+    if s.check() == unsat:
+        return None
+    else:
+        (s.model(), (p, pp, q, qq), HEADER_INDEX)
+
 def isolated(topo, policy1, policy2):
     """Determine if policy1 is isolated from policy2.
 
