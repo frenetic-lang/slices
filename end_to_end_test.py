@@ -30,13 +30,16 @@
 ################################################################################
 """Test slice compiler with SAT solver.
 
-There are some tests in this file that take 5-10 minutes to run.  They are
+There are some tests in this file that take 30 or so minutes to run.  They are
 diabled unless the EXPENSIVE_TESTS enviroment variable is set.
 
     `export EXPENSIVE_TESTS=1`
-    to set it, and
+
+to set it, and
+
     `unset EXPENSIVE_TESTS`
-    to unset it.
+
+to unset it.
 """
 
 from examples import topology_gen, policy_gen
