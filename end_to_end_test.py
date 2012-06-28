@@ -40,6 +40,8 @@ to set it, and
     `unset EXPENSIVE_TESTS`
 
 to unset it.
+
+To print out finer-grained progress information on tests, set VERBOSE_TESTS.
 """
 
 from examples import topology_gen, policy_gen
@@ -50,6 +52,8 @@ import networkx as nx
 import netcore as nc
 import os
 import unittest
+
+verbose = 'VERBOSE_TESTS' in os.environ
 
 def linear(*linear_nodes):
     """Linear graph on four nodes, slices overlap on middle 2 nodes."""
@@ -126,14 +130,14 @@ class TestVerify(unittest.TestCase):
 
     def testForwarding(self):
         topo, policies = linear((0, 1), (2, 3))
-        self.assertIsNone(sat.forwards(policies[0]))
-        self.assertIsNone(sat.forwards(policies[1]))
+        self.assertIsNone(sat.not_empty(policies[0]))
+        self.assertIsNone(sat.not_empty(policies[1]))
         topo, policies = linear((0, 1, 2), (1, 2, 3))
-        self.assertIsNotNone(sat.forwards(policies[0]))
-        self.assertIsNotNone(sat.forwards(policies[1]))
+        self.assertIsNotNone(sat.not_empty(policies[0]))
+        self.assertIsNotNone(sat.not_empty(policies[1]))
         topo, policies = linear_all_ports((0, 1), (2, 3))
-        self.assertIsNotNone(sat.forwards(policies[0]))
-        self.assertIsNotNone(sat.forwards(policies[1]))
+        self.assertIsNotNone(sat.not_empty(policies[0]))
+        self.assertIsNotNone(sat.not_empty(policies[1]))
 
 class TestCompile(unittest.TestCase):
     def testBasicCompile(self):
@@ -143,10 +147,8 @@ class TestCompile(unittest.TestCase):
         compiled = cp.compile_slices(combined)
         self.assertFalse(sat.isolated(topo, policies[0], policies[1]))
         self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
-        self.assertIsNotNone(sat.forwards(policies[0]))
-        self.assertIsNotNone(sat.forwards(policies[1]))
-        self.assertIsNotNone(sat.forwards(compiled[0]))
-        self.assertIsNotNone(sat.forwards(compiled[1]))
+        self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
+        self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
 
 class TestEdgeCompile(unittest.TestCase):
     def testBasicCompile(self):
@@ -156,10 +158,8 @@ class TestEdgeCompile(unittest.TestCase):
         compiled = ec.compile_slices(topo, combined)
         self.assertFalse(sat.isolated(topo, policies[0], policies[1]))
         self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
-        self.assertIsNotNone(sat.forwards(policies[0]))
-        self.assertIsNotNone(sat.forwards(policies[1]))
-        self.assertIsNotNone(sat.forwards(compiled[0]))
-        self.assertIsNotNone(sat.forwards(compiled[1]))
+        self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
+        self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
 
         topo, policies = linear((0, 1, 2), (1, 2, 3))
         slices = [slicing.ident_map_slice(topo, {}) for p in policies]
@@ -167,10 +167,8 @@ class TestEdgeCompile(unittest.TestCase):
         compiled = ec.compile_slices(topo, combined)
         self.assertFalse(sat.isolated(topo, policies[0], policies[1]))
         self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
-        self.assertIsNotNone(sat.forwards(policies[0]))
-        self.assertIsNotNone(sat.forwards(policies[1]))
-        self.assertIsNotNone(sat.forwards(compiled[0]))
-        self.assertIsNotNone(sat.forwards(compiled[1]))
+        self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
+        self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
 
         topo, policies = linear((0, 1), (2, 3))
         slices = [slicing.ident_map_slice(topo, {}) for p in policies]
@@ -178,10 +176,8 @@ class TestEdgeCompile(unittest.TestCase):
         compiled = ec.compile_slices(topo, combined)
         self.assertTrue(sat.isolated(topo, policies[0], policies[1]))
         self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
-        self.assertIsNone(sat.forwards(policies[0]))
-        self.assertIsNone(sat.forwards(policies[1]))
-        self.assertIsNone(sat.forwards(compiled[0]))
-        self.assertIsNone(sat.forwards(compiled[1]))
+        self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
+        self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
 
         topo, policies = linear_all_ports((0, 1), (2, 3))
         slices = [slicing.ident_map_slice(topo, {}) for p in policies]
@@ -189,10 +185,8 @@ class TestEdgeCompile(unittest.TestCase):
         compiled = ec.compile_slices(topo, combined)
         self.assertTrue(sat.isolated(topo, policies[0], policies[1]))
         self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
-        self.assertIsNotNone(sat.forwards(policies[0]))
-        self.assertIsNotNone(sat.forwards(policies[1]))
-        self.assertIsNotNone(sat.forwards(compiled[0]))
-        self.assertIsNotNone(sat.forwards(compiled[1]))
+        self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
+        self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
 
 class TestCompleteGraph(unittest.TestCase):
     def setUp(self):
@@ -206,6 +200,7 @@ class TestCompleteGraph(unittest.TestCase):
     def testExpensivePhysEquiv(self):
         self.physEquiv(k10_nodes, self.k10policies)
 
+    @unittest.skip('')
     def testCheapPhysEquiv(self):
         self.physEquiv(k4_nodes, self.k4policies)
 
@@ -213,6 +208,7 @@ class TestCompleteGraph(unittest.TestCase):
     def testExpensivePhysSep(self):
         self.physSep(k10_nodes, self.k10topo, self.k10policies)
 
+    @unittest.skip('')
     def testCheapPhysSep(self):
         self.physSep(k4_nodes, self.k4topo, self.k4policies)
 
@@ -233,7 +229,8 @@ class TestCompleteGraph(unittest.TestCase):
     def physEquiv(self, nodes, policies):
         for i in range(0, len(policies)):
             for j in range(len(policies)):
-                print "testing %s equiv %s." % (nodes[i], nodes[j])
+                if verbose:
+                    print "testing %s equiv %s." % (nodes[i], nodes[j])
                 result = sat.equivalent(policies[i],
                                         nc.PolicyUnion(policies[i],
                                                        policies[j]))
@@ -246,7 +243,8 @@ class TestCompleteGraph(unittest.TestCase):
     def physSep(self, nodes, topo, policies):
         for i in range(0, len(policies)):
             for j in range(len(policies)):
-                print "testing %s with %s." % (nodes[i], nodes[j])
+                if verbose:
+                    print "testing %s with %s." % (nodes[i], nodes[j])
                 result = sat.isolated(topo, policies[i], policies[j])
                 if len(set(nodes[i]).intersection(nodes[j])) > 1:
                     self.assertFalse(result)
@@ -255,27 +253,39 @@ class TestCompleteGraph(unittest.TestCase):
 
     def sliceCompile(self, nodes, topo, combined):
         compiled = cp.compile_slices(combined)
+
         for i in range(len(compiled)):
+            self.assertTrue(sat.compiled_correctly(combined[i][1],
+                                                   compiled[i]))
             for j in range(len(compiled)):
-                print "testing compiled %s with %s."\
-                      % (nodes[i], nodes[j])
+                if verbose:
+                    print "testing compiled %s with %s."\
+                          % (nodes[i], nodes[j])
                 result = sat.isolated(topo, compiled[i], compiled[j])
                 if i == j:
                     self.assertFalse(result)
                 else:
+                    self.assertFalse(sat.compiled_correctly(combined[i][1],
+                                                            compiled[j]))
                     self.assertTrue(result)
 
     def edgeCompile(self, nodes, topo, combined):
-        compiled = ec.compile_slices(topo, combined, verbose=True)
+        compiled = ec.compile_slices(topo, combined, verbose=verbose)
 
         for i in range(len(compiled)):
+# This won't work with the edge compiler yet.
+#            self.assertTrue(sat.compiled_correctly(combined[i][1],
+#                                                   compiled[i]))
             for j in range(len(compiled)):
-                print "testing edge compiled %s with %s."\
-                      % (nodes[i], nodes[j])
+                if verbose:
+                    print "testing edge compiled %s with %s."\
+                          % (nodes[i], nodes[j])
                 result = sat.isolated(topo, compiled[i], compiled[j])
                 if i == j:
                     self.assertFalse(result)
                 else:
+#                    self.assertFalse(sat.compiled_correctly(combined[i][1],
+#                                                            compiled[j]))
                     self.assertTrue(result)
 
 if __name__ == '__main__':

@@ -33,118 +33,17 @@
 No observations yet.
 """
 
-from z3.z3 import And, Or, Not, Implies, Function, DeclareSort, IntSort
+from z3.z3 import And, Or, Not, Implies, Function
 from z3.z3 import Consts, Solver, unsat
 from netcore import HEADERS
 import netcore as nc
 
-Packet = DeclareSort('Packet')
+from sat_core import nary_or, nary_and, HEADER_INDEX, Packet
+from sat_core import match_of_policy as forwards
 
-HEADER_INDEX = {}
-for h in HEADERS:
-    HEADER_INDEX[h] = Function(h, Packet, IntSort())
-
-def nary_or(constraints):
-    if len(constraints) < 1:
-        return False
-    if len(constraints) == 1:
-        return constraints[0]
-    else:
-        return Or(constraints[0], nary_or(constraints[1:]))
-
-def nary_and(constraints):
-    if len(constraints) < 1:
-        return False
-    if len(constraints) == 1:
-        return constraints[0]
-    else:
-        return And(constraints[0], nary_and(constraints[1:]))
-
-def match_of_predicate(pred, pkt):
-    """Build the constraint for pred on pkt."""
-    if isinstance(pred, nc.Top):
-        return True
-    elif isinstance(pred, nc.Bottom):
-        return False
-    elif isinstance(pred, nc.Header):
-        # Default to accepting, since the blank header accepts everything.
-        constraints = [True] if len(pred.fields) == 0 else []
-        for field, value in pred.fields.items():
-            constraints.append(HEADER_INDEX[field](pkt) == value)
-        # Never empty, so never completely false.
-        return nary_and(constraints)
-    elif isinstance(pred, nc.Union):
-        left = match_of_predicate(pred.left, pkt)
-        right = match_of_predicate(pred.right, pkt)
-        return Or(left, right)
-    elif isinstance(pred, nc.Intersection):
-        left = match_of_predicate(pred.left, pkt)
-        right = match_of_predicate(pred.right, pkt)
-        return And(left, right)
-    elif isinstance(pred, nc.Difference):
-        left = match_of_predicate(pred.left, pkt)
-        right = match_of_predicate(pred.right, pkt)
-        return And(left, Not(right))
-
-# TODO(astory): observations
-def modify_packet(action, p_in, p_out):
-    """Build the constraint for action producing p_out from p_in."""
-    ports = action.ports
-    modify = action.modify
-    obs = action.obs
-
-    constraints = []
-    constraints.append(HEADER_INDEX['switch'](p_out) == action.switch)
-
-    port_constraints = []
-    for p in ports:
-        port_constraints.append(HEADER_INDEX['port'](p_out) == p)
-    # Note that if there are no ports, port_constraints is empty, so we get
-    # False back:  drop the packet, no packet can match.
-    constraints.append(nary_or(port_constraints))
-
-    for h in HEADERS:
-        if h is not 'switch' and h is not 'port':
-            # If a h is not modified, it must remain constant across both
-            # packets.
-            if h not in modify:
-                constraints.append(HEADER_INDEX[h](p_in) ==
-                                   HEADER_INDEX[h](p_out))
-            else:
-                constraints.append(HEADER_INDEX[h](p_out) == modify[h])
-
-    # We add at least two constraints, so constraints is never empty.
-    return nary_and(constraints)
-
-def match_of_policy(policy, p_in, p_out):
-    """Build constraint for policy producing p_in from p_out in one hop."""
-    if isinstance(policy, nc.BottomPolicy):
-        # No forwarding happens, fail immediately (unless there's a union above
-        # us, in which case the Or takes care of it)
-        return False
-    elif isinstance(policy, nc.PrimitivePolicy):
-        pred = policy.predicate
-        actions = policy.actions
-        # If the predicate matches, any one of the actions may fire.
-        action_constraints = nary_or([modify_packet(a, p_in, p_out)
-                                      for a in actions])
-        # Use and here rather than implies because if the input packet doesn't
-        # match, we don't want the rule to fire - without this, we can get
-        # really weird behavior if the predicate is false over a packet, since
-        # False -> x for all x
-        return And(match_of_predicate(pred, p_in), action_constraints)
-    elif isinstance(policy, nc.PolicyUnion):
-        left = policy.left
-        right = policy.right
-        return Or(match_of_policy(left, p_in, p_out),
-                  match_of_policy(right, p_in, p_out))
-    elif isinstance(policy, nc.PolicyRestriction):
-        subpolicy = policy.policy
-        pred = policy.predicate
-        return And(match_of_policy(subpolicy, p_in, p_out),
-                   match_of_predicate(pred, p_in))
-    else:
-        raise Exception('unknown policy type: %s' % policy.__class__)
+switch = HEADER_INDEX['switch']
+port = HEADER_INDEX['port']
+vlan = HEADER_INDEX['vlan']
 
 def transfer(topo, p_out, p_in):
     """Build constraint for moving p_out to p_in across an edge."""
@@ -154,14 +53,10 @@ def transfer(topo, p_out, p_in):
         p2 = topo.node[s2]['ports'][s1]
         # Need both directions because topo.edges() only gives one direction for
         # undirected graphs.
-        constraint1 = And(And(HEADER_INDEX['switch'](p_out) == s1,
-                              HEADER_INDEX['port'](p_out) == p1),
-                          And(HEADER_INDEX['switch'](p_in) == s2,
-                              HEADER_INDEX['port'](p_in) == p2))
-        constraint2 = And(And(HEADER_INDEX['switch'](p_out) == s2,
-                              HEADER_INDEX['port'](p_out) == p2),
-                          And(HEADER_INDEX['switch'](p_in) == s1,
-                              HEADER_INDEX['port'](p_in) == p1))
+        constraint1 = And(And(switch(p_out) == s1, port(p_out) == p1),
+                          And(switch(p_in) == s2, port(p_in) == p2))
+        constraint2 = And(And(switch(p_out) == s2, port(p_out) == p2),
+                          And(switch(p_in) == s1, port(p_in) == p1))
         options.append(constraint1)
         options.append(constraint2)
     forward = nary_or(options)
@@ -189,6 +84,7 @@ def explain(model, packet, headers):
             pass
     return properties
 
+# TODO(astory): make sure this is rigorous.  I think it might have holes in it.
 def equivalent(policy1, policy2):
     """Determine if policy1 is equivalent to policy2 under equality.
 
@@ -200,14 +96,14 @@ def equivalent(policy1, policy2):
     s = Solver()
     # There are two components to this.  First, we want to ensure that if p1
     # forwards a packet, p2 also forwards it
-    constraint = Implies(match_of_policy(policy1, p1_in, p1_out),
-                         match_of_policy(policy2, p1_in, p1_out))
+    constraint = Implies(forwards(policy1, p1_in, p1_out),
+                         forwards(policy2, p1_in, p1_out))
     # Second, we want to ensure that if p2 forwards a packet, and it's a packet
     # that p1 can forward, that p2 only forwards it in ways that p1 does.
     constraint = And(constraint,
-                     Implies(And(match_of_policy(policy2, p2_in, p2_out1),
-                                 match_of_policy(policy1, p2_in, p2_out2)),
-                             match_of_policy(policy1, p2_in, p2_out1)))
+                     Implies(And(forwards(policy2, p2_in, p2_out1),
+                                 forwards(policy1, p2_in, p2_out2)),
+                             forwards(policy1, p2_in, p2_out1)))
     # We want to check for emptiness, so our model gives us a packet back
     s.add(Not(constraint))
 
@@ -219,7 +115,7 @@ def equivalent(policy1, policy2):
         return (s.model(), (p1_in, p1_out, p2_in, p2_out1, p2_out2),
                 HEADER_INDEX)
 
-def forwards(policy):
+def not_empty(policy):
     """Determine if there are any packets that the policy forwards.
 
     RETURNS:
@@ -228,7 +124,7 @@ def forwards(policy):
     """
     p_in, p_out = Consts('p_in p_out', Packet)
     s = Solver()
-    s.add(match_of_policy(policy, p_in, p_out))
+    s.add(forwards(policy, p_in, p_out))
     if s.check() == unsat:
         return None
     else:
@@ -237,7 +133,7 @@ def forwards(policy):
 def equiv_modulo(fields, p1, p2):
     """Return a predicate testing if p1 and p2 are equivalent up to fields."""
     constraints = []
-    for h in Headers:
+    for h in HEADERS:
         if h not in fields:
             constraints.append(HEADER_INDEX[h](p1) == HEADER_INDEX[h](p2))
 
@@ -272,20 +168,31 @@ def no_new_behaviors(orig, result):
 
     Tests:
     p -R-> p' /\ p ~vl~ q /\ p' ~vl~ q' => q -O-> q'
+    and vlan(q) = vlan(q')
+
+    Intuitively, this means that if R can forward a packet in some way, then O
+    can also forward a packet that way, modulo vlans.
+
+    We need the extra restriction on q maintaining vlans because O shouldn't
+    modify vlans, so it's easy for the solver to find a pair of packets that O
+    can't produce because they are on different vlans.
 
     RETURNS: None or (model, (p, p', q, q'), HEADERS)
     """
     p, pp, q, qq = Consts('p pp q qq', Packet)
     s = Solver()
-    s.add(Not(Implies(And(match_of_policy(result, p, pp),
+    s.add(Not(Implies(And(forwards(result, p, pp),
                           And(equiv_modulo(['vlan'], p, q),
-                              equiv_modulo(['vlan'], p, q))),
-                      match_of_policy(orig, q, qq))))
+                              equiv_modulo(['vlan'], pp, qq))),
+                      forwards(orig, q, qq))))
+    s.add(vlan(q) == vlan(qq))
     if s.check() == unsat:
         return None
     else:
-        (s.model(), (p, pp, q, qq), HEADER_INDEX)
+        return (s.model(), (p, pp, q, qq), HEADER_INDEX)
 
+# TODO(astory): relax vlan(q) = vlan(q').  This means we can't use it with the
+# edge compiler as written.
 def no_lost_behaviors(orig, result):
     """Determine if result does not lose any forwarding options.
 
@@ -294,21 +201,36 @@ def no_lost_behaviors(orig, result):
     ~vl~ means equivalent up to vlans
 
     Tests:
-    p -O-> p' /\ vlan(p) = 0 /\ p ~vl~ q /\ p' ~vl~ q' => q -R-> q'
+    p -O-> p' /\ vlan(p) = 0 /\ 
+        p ~vl~ q /\ p' ~vl~ q' /\ 
+        r -R->r' /\ vlan(r) = vlan(q) =>
+    q -R-> q'
+    and vlan(q) = vlan(q')
+
+    Intuitively, this means that if O can forward a packet in vlan 0 some way,
+    then R can forward a packet in its vlan in the same way.
+
+    We need the extra restriction on q maintaining vlans because R shouldn't
+    modify vlans, so it's easy for the solver to find a pair of packets that R
+    can't produce because they are on different vlans.
 
     RETURNS: None or (model, (p, p', q, q'), HEADERS)
+    Returning r is unneeded since it just holds the vlan tag that q has.
     """
     p, pp, q, qq = Consts('p pp q qq', Packet)
+    r, rr = Consts('r rr', Packet)
     s = Solver()
-    s.add(Not(Implies(And(And(match_of_policy(orig, p, pp),
-                              HEADER_INDEX['vlan'](p) == 0),
-                          And(equiv_modulo(['vlan'](p, q)),
-                              equiv_modulo(['vlan'](pp, qq)))),
-                      match_of_policy(result, q, qq))))
+    s.add(Not(Implies(And(And(forwards(orig, p, pp),
+                              vlan(p) == 0),
+                          And(equiv_modulo(['vlan'], p, q),
+                              equiv_modulo(['vlan'], pp, qq))),
+                      forwards(result, q, qq))))
+    s.add(And(forwards(result, r, rr), vlan(r) == vlan(q)))
+    s.add(vlan(q) == vlan(qq))
     if s.check() == unsat:
         return None
     else:
-        (s.model(), (p, pp, q, qq), HEADER_INDEX)
+        return (s.model(), (p, pp, q, qq), HEADER_INDEX)
 
 def isolated(topo, policy1, policy2):
     """Determine if policy1 is isolated from policy2.
@@ -361,9 +283,9 @@ def isolated_model(topo, policy1, policy2):
     """
     pkt1, pkt2, pkt3, pkt4 = Consts('pkt1 pkt2 pkt3 pkt4', Packet)
     s = Solver()
-    s.add(match_of_policy(policy1, pkt1, pkt2))
+    s.add(forwards(policy1, pkt1, pkt2))
     s.add(transfer(topo, pkt2, pkt3))
-    s.add(match_of_policy(policy2, pkt3, pkt4))
+    s.add(forwards(policy2, pkt3, pkt4))
 
     if s.check() == unsat:
         return None
