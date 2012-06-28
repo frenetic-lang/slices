@@ -52,70 +52,9 @@ import networkx as nx
 import netcore as nc
 import os
 import unittest
+from test_util import linear, linear_all_ports, k10_nodes, k10, k4_nodes, k4
 
 verbose = 'VERBOSE_TESTS' in os.environ
-
-def linear(*linear_nodes):
-    """Linear graph on four nodes, slices overlap on middle 2 nodes."""
-    topo = nxtopo.from_graph(nx.path_graph(4))
-    topo.finalize()
-
-    topos = [topo.subgraph(nodes) for nodes in linear_nodes]
-    policies = [policy_gen.flood(t) for t in topos]
-    return topo, policies
-
-def linear_all_ports(*linear_nodes):
-    """Linear graph on four nodes with reflexive forwarding."""
-    topo = nxtopo.from_graph(nx.path_graph(4))
-    topo.finalize()
-
-    topos = [topo.subgraph(nodes) for nodes in linear_nodes]
-    policies = [policy_gen.flood(t, all_ports=True) for t in topos]
-    return topo, policies
-
-k10_nodes = [
-               (0, 1, 2, 3, 4),
-               (1, 2, 3, 4, 5),
-               (2, 3, 4, 5, 6),
-               (3, 4, 5, 6, 7),
-               (4, 5, 6, 7, 8),
-               (5, 6, 7, 8, 9),
-               (6, 7, 8, 9, 0),
-               (7, 8, 9, 0, 1),
-               (8, 9, 0, 1, 2),
-               (9, 0, 1, 2, 3),
-              ]
-
-def k10():
-    """K10 complete graph."""
-    topo = nxtopo.from_graph(nx.complete_graph(10))
-    topo.finalize()
-
-    topos = [topo.subgraph(nodes) for nodes in k10_nodes]
-    edge_policies = [{} for t in topos]
-    slices = [slicing.ident_map_slice(t, pol)
-              for t, pol in zip(topos, edge_policies)]
-    combined = zip(slices, [policy_gen.flood(t) for t in topos])
-    return (topo, combined)
-
-k4_nodes = [
-            (0, 1, 2),
-            (1, 2, 3),
-            (2, 3, 0),
-            (3, 0, 1),
-           ]
-
-def k4():
-    """K4 complete graph."""
-    topo = nxtopo.from_graph(nx.complete_graph(4))
-    topo.finalize()
-
-    topos = [topo.subgraph(nodes) for nodes in k4_nodes]
-    edge_policies = [{} for t in topos]
-    slices = [slicing.ident_map_slice(t, pol)
-              for t, pol in zip(topos, edge_policies)]
-    combined = zip(slices, [policy_gen.flood(t) for t in topos])
-    return (topo, combined)
 
 class TestVerify(unittest.TestCase):
     def testBasicOverlap(self):
@@ -200,7 +139,6 @@ class TestCompleteGraph(unittest.TestCase):
     def testExpensivePhysEquiv(self):
         self.physEquiv(k10_nodes, self.k10policies)
 
-    @unittest.skip('')
     def testCheapPhysEquiv(self):
         self.physEquiv(k4_nodes, self.k4policies)
 
@@ -208,7 +146,6 @@ class TestCompleteGraph(unittest.TestCase):
     def testExpensivePhysSep(self):
         self.physSep(k10_nodes, self.k10topo, self.k10policies)
 
-    @unittest.skip('')
     def testCheapPhysSep(self):
         self.physSep(k4_nodes, self.k4topo, self.k4policies)
 
