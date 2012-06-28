@@ -33,6 +33,8 @@ from z3.z3 import And, Or, Not, Function, DeclareSort, IntSort
 from netcore import HEADERS
 import netcore as nc
 
+HEADERS= ['switch', 'port', 'vlan']
+
 Packet = DeclareSort('Packet')
 
 HEADER_INDEX = {}
@@ -49,7 +51,7 @@ def nary_or(constraints):
 
 def nary_and(constraints):
     if len(constraints) < 1:
-        return False
+        return True
     if len(constraints) == 1:
         return constraints[0]
     else:
@@ -63,10 +65,9 @@ def match_of_predicate(pred, pkt):
         return False
     elif isinstance(pred, nc.Header):
         # Default to accepting, since the blank header accepts everything.
-        constraints = [True] if len(pred.fields) == 0 else []
+        constraints = []
         for field, value in pred.fields.items():
             constraints.append(HEADER_INDEX[field](pkt) == value)
-        # Never empty, so never completely false.
         return nary_and(constraints)
     elif isinstance(pred, nc.Union):
         left = match_of_predicate(pred.left, pkt)
@@ -89,6 +90,7 @@ def modify_packet(action, p_in, p_out):
     obs = action.obs
 
     constraints = []
+    constraints.append(HEADER_INDEX['switch'](p_in) == action.switch)
     constraints.append(HEADER_INDEX['switch'](p_out) == action.switch)
 
     port_constraints = []

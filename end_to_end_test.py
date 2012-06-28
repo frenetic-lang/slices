@@ -86,6 +86,7 @@ class TestCompile(unittest.TestCase):
         compiled = cp.compile_slices(combined)
         self.assertFalse(sat.isolated(topo, policies[0], policies[1]))
         self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
+
         self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
 
@@ -127,6 +128,7 @@ class TestEdgeCompile(unittest.TestCase):
         self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
 
+@unittest.skip('')
 class TestCompleteGraph(unittest.TestCase):
     def setUp(self):
         self.k10topo, self.k10combined = k10()
@@ -202,17 +204,16 @@ class TestCompleteGraph(unittest.TestCase):
                 if i == j:
                     self.assertFalse(result)
                 else:
-                    self.assertFalse(sat.compiled_correctly(combined[i][1],
-                                                            compiled[j]))
+                    cc = sat.compiled_correctly(combined[i][1], compiled[j])
+                    self.assertIsNotNone(cc)
                     self.assertTrue(result)
 
     def edgeCompile(self, nodes, topo, combined):
         compiled = ec.compile_slices(topo, combined, verbose=verbose)
 
         for i in range(len(compiled)):
-# This won't work with the edge compiler yet.
-#            self.assertTrue(sat.compiled_correctly(combined[i][1],
-#                                                   compiled[i]))
+#            self.assertIsNone(sat.compiled_correctly(combined[i][1],
+#                                                     compiled[i]))
             for j in range(len(compiled)):
                 if verbose:
                     print "testing edge compiled %s with %s."\
@@ -221,8 +222,8 @@ class TestCompleteGraph(unittest.TestCase):
                 if i == j:
                     self.assertFalse(result)
                 else:
-#                    self.assertFalse(sat.compiled_correctly(combined[i][1],
-#                                                            compiled[j]))
+#                    self.assertIsNotNone(sat.compiled_correctly(combined[i][1],
+#                                                                compiled[j]))
                     self.assertTrue(result)
 
 if __name__ == '__main__':

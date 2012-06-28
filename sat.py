@@ -30,12 +30,14 @@
 ################################################################################
 """Sat conversion and solving for netcore.
 
+ONLY CHECK FOR UNSAT UNLESS YOU'RE MARK
+
 No observations yet.
 """
 
-from z3.z3 import And, Or, Not, Implies, Function
-from z3.z3 import Consts, Solver, unsat
-from netcore import HEADERS
+from z3.z3 import And, Or, Not, Implies, Function, ForAll, Exists
+from z3.z3 import Consts, Solver, unsat, IntSort
+from sat_core import HEADERS
 import netcore as nc
 
 from sat_core import nary_or, nary_and, HEADER_INDEX, Packet
@@ -145,92 +147,42 @@ def compiled_correctly(orig, result):
     Performs the following tests:
     O is the original policy
     R is the resulting policy
-    ~vl~ means equivalent up to vlans
-
-    No new behaviors:
-    p -R-> p' /\ p ~vl~ q /\ p' ~vl~ q' => q -O-> q'
+    ~ means equivalent up to vlans
 
     No lost behaviors:
-    p -O-> p' /\ vlan(p) = 0 /\ p ~vl~ q /\ p' ~vl~ q' => q -R-> q'
+    p -O-> p' => \exists q, q' . p ~ q /\ p' ~ q' /\ q -R-> q'
+
+    No new behaviors:
+    p -R-> p' => \exists q, q' . p ~ q /\ p' ~ q' /\ q -O-> q'
 
     RETURNS: True or False.  For models and diagnostics use no_new_behaviors and
     no_lost_behaviors.
     """
-    return (no_new_behaviors(orig, result) is None and
-            no_lost_behaviors(orig, result) is None)
+    return simulates(orig, result) is None and simulates(orig, result) is None
 
-def no_new_behaviors(orig, result):
-    """Determine if result does not introduce any new forwarding options.
-
-    O is the original policy
-    R is the resulting policy
-    ~vl~ means equivalent up to vlans
-
-    Tests:
-    p -R-> p' /\ p ~vl~ q /\ p' ~vl~ q' => q -O-> q'
-    and vlan(q) = vlan(q')
-
-    Intuitively, this means that if R can forward a packet in some way, then O
-    can also forward a packet that way, modulo vlans.
-
-    We need the extra restriction on q maintaining vlans because O shouldn't
-    modify vlans, so it's easy for the solver to find a pair of packets that O
-    can't produce because they are on different vlans.
-
-    RETURNS: None or (model, (p, p', q, q'), HEADERS)
-    """
+def simulates(a, b):
+    """Determine if b simulates a."""
+    def eq(p1, p2):
+        return equiv_modulo(['vlan'], p1, p2)
     p, pp, q, qq = Consts('p pp q qq', Packet)
-    s = Solver()
-    s.add(Not(Implies(And(forwards(result, p, pp),
-                          And(equiv_modulo(['vlan'], p, q),
-                              equiv_modulo(['vlan'], pp, qq))),
-                      forwards(orig, q, qq))))
-    s.add(vlan(q) == vlan(qq))
-    if s.check() == unsat:
+
+    solv = Solver()
+#   solv.add(And(forwards(a, p, pp),
+#                Not(Exists([q, qq], And(eq(p, q),
+#                                        forwards(b, q, qq),
+#                                        eq(pp, qq))))))
+    solv.add(And(forwards(a, p, pp),
+                 ForAll([q, qq], And(eq(p, q),
+                                     Not(And(forwards(b, q, qq),
+                                             eq(pp, qq)))))))
+#    print solv
+#    print solv.check()
+    if solv.check() == unsat:
         return None
     else:
-        return (s.model(), (p, pp, q, qq), HEADER_INDEX)
-
-# TODO(astory): relax vlan(q) = vlan(q').  This means we can't use it with the
-# edge compiler as written.
-def no_lost_behaviors(orig, result):
-    """Determine if result does not lose any forwarding options.
-
-    O is the original policy
-    R is the resulting policy
-    ~vl~ means equivalent up to vlans
-
-    Tests:
-    p -O-> p' /\ vlan(p) = 0 /\ 
-        p ~vl~ q /\ p' ~vl~ q' /\ 
-        r -R->r' /\ vlan(r) = vlan(q) =>
-    q -R-> q'
-    and vlan(q) = vlan(q')
-
-    Intuitively, this means that if O can forward a packet in vlan 0 some way,
-    then R can forward a packet in its vlan in the same way.
-
-    We need the extra restriction on q maintaining vlans because R shouldn't
-    modify vlans, so it's easy for the solver to find a pair of packets that R
-    can't produce because they are on different vlans.
-
-    RETURNS: None or (model, (p, p', q, q'), HEADERS)
-    Returning r is unneeded since it just holds the vlan tag that q has.
-    """
-    p, pp, q, qq = Consts('p pp q qq', Packet)
-    r, rr = Consts('r rr', Packet)
-    s = Solver()
-    s.add(Not(Implies(And(And(forwards(orig, p, pp),
-                              vlan(p) == 0),
-                          And(equiv_modulo(['vlan'], p, q),
-                              equiv_modulo(['vlan'], pp, qq))),
-                      forwards(result, q, qq))))
-    s.add(And(forwards(result, r, rr), vlan(r) == vlan(q)))
-    s.add(vlan(q) == vlan(qq))
-    if s.check() == unsat:
-        return None
-    else:
-        return (s.model(), (p, pp, q, qq), HEADER_INDEX)
+        return solv.model(), (
+                              p, pp, q, qq
+                              ), HEADER_INDEX
 
 def isolated(topo, policy1, policy2):
     """Determine if policy1 is isolated from policy2.
