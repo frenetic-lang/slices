@@ -128,7 +128,6 @@ class TestEdgeCompile(unittest.TestCase):
         self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
 
-@unittest.skip('')
 class TestCompleteGraph(unittest.TestCase):
     def setUp(self):
         self.k10topo, self.k10combined = k10()
@@ -212,8 +211,8 @@ class TestCompleteGraph(unittest.TestCase):
         compiled = ec.compile_slices(topo, combined, verbose=verbose)
 
         for i in range(len(compiled)):
-#            self.assertIsNone(sat.compiled_correctly(combined[i][1],
-#                                                     compiled[i]))
+            self.assertIsNone(sat.compiled_correctly(combined[i][1],
+                                                     compiled[i]))
             for j in range(len(compiled)):
                 if verbose:
                     print "testing edge compiled %s with %s."\

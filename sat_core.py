@@ -29,7 +29,7 @@
 # Sat conversion for netcore.                                                  #
 ################################################################################
 
-from z3.z3 import And, Or, Not, Function, DeclareSort, IntSort
+from z3.z3 import And, Or, Not, Function, DeclareSort, IntSort, BoolSort
 from netcore import HEADERS
 import netcore as nc
 
@@ -40,22 +40,18 @@ Packet = DeclareSort('Packet')
 HEADER_INDEX = {}
 for h in HEADERS:
     HEADER_INDEX[h] = Function(h, Packet, IntSort())
-
+    
 def nary_or(constraints):
     if len(constraints) < 1:
         return False
-    if len(constraints) == 1:
-        return constraints[0]
     else:
-        return Or(constraints[0], nary_or(constraints[1:]))
+        return Or(*constraints)
 
 def nary_and(constraints):
     if len(constraints) < 1:
         return True
-    if len(constraints) == 1:
-        return constraints[0]
     else:
-        return And(constraints[0], nary_and(constraints[1:]))
+        return And(*constraints)
 
 def match_of_predicate(pred, pkt):
     """Build the constraint for pred on pkt."""
@@ -113,7 +109,37 @@ def modify_packet(action, p_in, p_out):
     # We add at least two constraints, so constraints is never empty.
     return nary_and(constraints)
 
-def match_of_policy(policy, p_in, p_out):
+def match_of_policy(policy, packet, test_forward=False):
+    """Determine if policy matches a packet.
+    
+    if test_forward=True, also verify that it doesn't just drop the packet even
+    if it matches.
+    """
+    if isinstance(policy, nc.BottomPolicy):
+        # No forwarding happens, fail immediately (unless there's a union above
+        # us, in which case the Or takes care of it)
+        return False
+    elif isinstance(policy, nc.PrimitivePolicy):
+        pred = policy.predicate
+        if test_forward:
+            actions = policy.actions
+            # If the predicate matches, any one of the actions may fire.
+            return And(match_of_predicate(pred, packet), len(actions) > 0)
+        return match_of_predicate(pred, packet)
+    elif isinstance(policy, nc.PolicyUnion):
+        left = policy.left
+        right = policy.right
+        return Or(match_of_policy(left, packet),
+                  match_of_policy(right, packet))
+    elif isinstance(policy, nc.PolicyRestriction):
+        subpolicy = policy.policy
+        pred = policy.predicate
+        return And(match_of_policy(subpolicy, packet),
+                   match_of_predicate(pred, packet))
+    else:
+        raise Exception('unknown policy type: %s' % policy.__class__)
+
+def forwards(policy, p_in, p_out):
     """Build constraint for policy producing p_in from p_out in one hop."""
     if isinstance(policy, nc.BottomPolicy):
         # No forwarding happens, fail immediately (unless there's a union above
@@ -133,12 +159,12 @@ def match_of_policy(policy, p_in, p_out):
     elif isinstance(policy, nc.PolicyUnion):
         left = policy.left
         right = policy.right
-        return Or(match_of_policy(left, p_in, p_out),
-                  match_of_policy(right, p_in, p_out))
+        return Or(forwards(left, p_in, p_out),
+                  forwards(right, p_in, p_out))
     elif isinstance(policy, nc.PolicyRestriction):
         subpolicy = policy.policy
         pred = policy.predicate
-        return And(match_of_policy(subpolicy, p_in, p_out),
+        return And(forwards(subpolicy, p_in, p_out),
                    match_of_predicate(pred, p_in))
     else:
         raise Exception('unknown policy type: %s' % policy.__class__)

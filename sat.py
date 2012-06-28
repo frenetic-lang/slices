@@ -41,7 +41,7 @@ from sat_core import HEADERS
 import netcore as nc
 
 from sat_core import nary_or, nary_and, HEADER_INDEX, Packet
-from sat_core import match_of_policy as forwards
+from sat_core import forwards, match_of_policy
 
 switch = HEADER_INDEX['switch']
 port = HEADER_INDEX['port']
@@ -161,25 +161,27 @@ def compiled_correctly(orig, result):
     return simulates(orig, result) is None and simulates(orig, result) is None
 
 def simulates(a, b):
-    """Determine if b simulates a."""
+    """Determine if b simulates a up to vlans."""
     def eq(p1, p2):
         return equiv_modulo(['vlan'], p1, p2)
     p, pp, q, qq = Consts('p pp q qq', Packet)
 
     solv = Solver()
-#   solv.add(And(forwards(a, p, pp),
-#                Not(Exists([q, qq], And(eq(p, q),
-#                                        forwards(b, q, qq),
-#                                        eq(pp, qq))))))
     solv.add(And(forwards(a, p, pp),
-                 ForAll([q, qq], And(eq(p, q),
-                                     Not(And(forwards(b, q, qq),
+                 Not(Exists([q, qq], Implies(match_of_policy(b, q),
+                                             And(eq(p, q),
+                                             forwards(b, q, qq),
                                              eq(pp, qq)))))))
-#    print solv
-#    print solv.check()
+#   solv.add(And(forwards(a, p, pp),
+#                ForAll([q, qq], And(eq(p, q),
+#                                    Not(And(forwards(b, q, qq),
+#                                            eq(pp, qq)))))))
+#   print solv
+#   print solv.check()
     if solv.check() == unsat:
         return None
     else:
+        print solv.model()
         return solv.model(), (
                               p, pp, q, qq
                               ), HEADER_INDEX
