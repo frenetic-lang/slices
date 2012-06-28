@@ -110,7 +110,7 @@ def compile_slices(combined, assigner=vl.sequential, verbose=False):
         full_policy = internal_strip_vlan_policy(slic, safe_inport_policy)
 
         policy_list.append(
-            full_policy.get_physical_rep(slic.node_map, slic.port_map))
+            full_policy.get_physical_rep(slic.node_map, slic.port_map).reduce())
         if verbose:
             print 'Processed %d slices.' % count
             count += 1
