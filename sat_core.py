@@ -30,16 +30,23 @@
 ################################################################################
 
 from z3.z3 import And, Or, Not, Function, DeclareSort, IntSort, BoolSort
+from z3.z3 import Consts, ForAll, Exists, Int, Implies
 from netcore import HEADERS
 import netcore as nc
 
 HEADERS= ['switch', 'port', 'vlan']
+MAX_VLAN = 4
+MAX_SWITCHES = 4
 
 Packet = DeclareSort('Packet')
 
 HEADER_INDEX = {}
 for h in HEADERS:
     HEADER_INDEX[h] = Function(h, Packet, IntSort())
+
+switch = HEADER_INDEX['switch']
+port = HEADER_INDEX['port']
+vlan = HEADER_INDEX['vlan']
     
 def nary_or(constraints):
     if len(constraints) < 1:
@@ -52,6 +59,13 @@ def nary_and(constraints):
         return True
     else:
         return And(*constraints)
+
+def sanity(f):
+    (p,) = Consts('sanity', Packet)
+    constraints = []
+    for i in range(MAX_VLAN):
+        constraints.append(Exists([p], HEADER_INDEX[f](p) == i))
+    return And(*constraints)
 
 def match_of_predicate(pred, pkt):
     """Build the constraint for pred on pkt."""

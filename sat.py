@@ -36,16 +36,14 @@ No observations yet.
 """
 
 from z3.z3 import And, Or, Not, Implies, Function, ForAll, Exists
-from z3.z3 import Consts, Solver, unsat, IntSort
+from z3.z3 import Consts, Solver, unsat, IntSort, set_option
 from sat_core import HEADERS
 import netcore as nc
 
-from sat_core import nary_or, nary_and, HEADER_INDEX, Packet
-from sat_core import forwards, match_of_policy
+set_option(pull_nested_quantifiers=True)
 
-switch = HEADER_INDEX['switch']
-port = HEADER_INDEX['port']
-vlan = HEADER_INDEX['vlan']
+from sat_core import nary_or, nary_and, HEADER_INDEX, Packet
+from sat_core import forwards, match_of_policy, sanity, switch, port, vlan
 
 def transfer(topo, p_out, p_in):
     """Build constraint for moving p_out to p_in across an edge."""
@@ -158,7 +156,7 @@ def compiled_correctly(orig, result):
     RETURNS: True or False.  For models and diagnostics use no_new_behaviors and
     no_lost_behaviors.
     """
-    return simulates(orig, result) is None and simulates(orig, result) is None
+    return simulates(orig, result) is None and simulates(result, orig) is None
 
 def simulates(a, b):
     """Determine if b simulates a up to vlans."""
@@ -167,20 +165,27 @@ def simulates(a, b):
     p, pp, q, qq = Consts('p pp q qq', Packet)
 
     solv = Solver()
+
+    # Nate's solution
+    solv.add(sanity('vlan'))
+    solv.add(sanity('switch'))
+    solv.add(sanity('port'))
     solv.add(And(forwards(a, p, pp),
-                 Not(Exists([q, qq], Implies(match_of_policy(b, q),
-                                             And(eq(p, q),
-                                             forwards(b, q, qq),
-                                             eq(pp, qq)))))))
+             ForAll([q], Or(Not(eq(p, q)),
+                            ForAll([qq], Or(Not(forwards(b, q, qq)),
+                                            Not(eq(pp, qq))))))))
+
+    # This one works for lots of cases, but fails weirdly in others
 #   solv.add(And(forwards(a, p, pp),
-#                ForAll([q, qq], And(eq(p, q),
-#                                    Not(And(forwards(b, q, qq),
-#                                            eq(pp, qq)))))))
-#   print solv
-#   print solv.check()
+#                Not(Exists([q, qq], Implies(match_of_policy(b, q),
+#                                            And(eq(p, q),
+#                                                forwards(b, q, qq),
+#                                                eq(pp, qq)))))))
     if solv.check() == unsat:
+#       import IPython.Shell; IPython.Shell.IPShellEmbed(argv=[])()
         return None
     else:
+        print solv.check()
         print solv.model()
         return solv.model(), (
                               p, pp, q, qq
