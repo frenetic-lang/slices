@@ -151,14 +151,15 @@ def compiled_correctly(orig, result):
     RETURNS: True or False.  For models and diagnostics use no_new_behaviors and
     no_lost_behaviors.
     """
-    return simulates(orig, result) is None and simulates(result, orig) is None
+    return (simulates(orig, result, ['vlan']) is None and
+            simulates(result, orig, ['vlan']) is None)
 
-def simulates(a, b):
-    """Determine if b simulates a up to vlans."""
-    fields = fields_of_policy(a).union(fields_of_policy(b))
-    QPacket, hs = make_qpacket(fields)
+def simulates(a, b, fields=[]):
+    """Determine if b simulates a up to fields."""
+    used_fields = fields_of_policy(a).union(fields_of_policy(b))
+    QPacket, hs = make_qpacket(used_fields)
     def eq(p1, p2):
-        return equiv_modulo(['vlan'], p1, p2, hs)
+        return equiv_modulo(fields, p1, p2, hs)
     p, pp, q, qq = Consts('p pp q qq', QPacket)
 
     solv = Solver()

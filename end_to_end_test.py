@@ -221,12 +221,12 @@ class TestCompleteGraph(unittest.TestCase):
             self.assertFalse(sat.isolated(topo, compiled[i], compiled[i]))
             for j in range(len(compiled)):
                 if verbose:
-                    print "testing edge compiled %s with %s."\
-                          % (nodes[i], nodes[j])
+                    print "testing edge compiled %d:%s with %d:%s."\
+                          % (i, nodes[i], j, nodes[j])
                 if i != j:
-                    r = sat.compiled_correctly(combined[i][1],
-                                               compiled[j])
-                    self.assertFalse(r)
+                    self.assertFalse(sat.compiled_correctly(combined[i][1],
+                                                            compiled[j]))
+
                     self.assertTrue(sat.isolated(topo, compiled[i],
                                                  compiled[j]))
 

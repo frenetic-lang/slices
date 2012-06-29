@@ -60,7 +60,7 @@ FIELD_SORTS = {
               }
 def make_qpacket(fields):
     """Construct a quantifier-safe packet type that only considers fields.
-    
+
     Note that fields are set in the order given, so keep that in mind if you're
     debugging models.
     """
