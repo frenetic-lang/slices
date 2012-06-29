@@ -25,7 +25,6 @@ class SatTest(unittest.TestCase):
         self.assertIsNone(sat.simulates(o, r))
         self.assertIsNone(sat.simulates(r, o))
     
-    @unittest.skip('')
     def test_compiled_badly(self):
         o = Header({'switch': 2, 'port': 1}) |then| Action(2, [1])
         r = BottomPolicy()

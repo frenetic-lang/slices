@@ -30,6 +30,11 @@
 ################################################################################
 """Test slice compiler with SAT solver.
 
+This tests both the compiler output and the SAT solver's verification, so a
+failed test could be from either.
+
+It's probably wise to not modify both in the same commit.
+
 There are some tests in this file that take 30 or so minutes to run.  They are
 diabled unless the EXPENSIVE_TESTS enviroment variable is set.
 
@@ -211,22 +216,17 @@ class TestCompleteGraph(unittest.TestCase):
         compiled = ec.compile_slices(topo, combined, verbose=verbose)
 
         for i in range(len(compiled)):
-            try:
-                self.assertTrue(sat.compiled_correctly(combined[i][1],
-                                                       compiled[i]))
-            except AssertionError:
-                import IPython.Shell; IPython.Shell.IPShellEmbed(argv=[])()
+            self.assertTrue(sat.compiled_correctly(combined[i][1],
+                                                   compiled[i]))
             self.assertFalse(sat.isolated(topo, compiled[i], compiled[i]))
             for j in range(len(compiled)):
                 if verbose:
                     print "testing edge compiled %s with %s."\
                           % (nodes[i], nodes[j])
                 if i != j:
-#                   r = sat.compiled_correctly(combined[i][1],
-#                                              compiled[j])
-#                   if r:
-#                       import IPython.Shell; IPython.Shell.IPShellEmbed(argv=[])()
-#                   self.assertFalse(r)
+                    r = sat.compiled_correctly(combined[i][1],
+                                               compiled[j])
+                    self.assertFalse(r)
                     self.assertTrue(sat.isolated(topo, compiled[i],
                                                  compiled[j]))
 
