@@ -40,6 +40,8 @@ from z3.z3 import Consts, Solver, unsat, IntSort, set_option
 from netcore import HEADERS
 import netcore as nc
 
+from util import fields_of_policy
+
 set_option(pull_nested_quantifiers=True)
 
 from sat_core import nary_or, nary_and
@@ -153,7 +155,8 @@ def compiled_correctly(orig, result):
 
 def simulates(a, b):
     """Determine if b simulates a up to vlans."""
-    QPacket, hs = make_qpacket(['switch', 'port', 'vlan'])
+    fields = fields_of_policy(a).union(fields_of_policy(b))
+    QPacket, hs = make_qpacket(fields)
     def eq(p1, p2):
         return equiv_modulo(['vlan'], p1, p2, hs)
     p, pp, q, qq = Consts('p pp q qq', QPacket)

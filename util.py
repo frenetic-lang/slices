@@ -56,3 +56,36 @@ def build_external_predicate(l_topo):
                 if target_port == 0: # that means target is an end host
                     predicates[(n, p)] = nc.Top()
     return predicates
+
+def fields_of_predicate(pred):
+    """Return all fields this predicate matches on."""
+    if isinstance(pred, nc.Top) or isinstance(pred, nc.Bottom):
+        return set([])
+    elif isinstance(pred, nc.Header):
+        return set(pred.fields.keys())
+    elif (isinstance(pred, nc.Union) or
+          isinstance(pred, nc.Intersection) or
+          isinstance(pred, nc.Difference)):
+        return fields_of_predicate(pred.left).union(
+               fields_of_predicate(pred.right))
+    else:
+        raise Exception('unknown predicate %s' % p)
+
+def fields_of_action(action):
+    return set(['switch', 'port']).union(set(action.modify.keys()))
+
+def fields_of_policy(pol):
+    """Return all fields this policy matches on or modifies."""
+    if isinstance(pol, nc.BottomPolicy):
+        return set([])
+    elif isinstance(pol, nc.PrimitivePolicy):
+        fields = fields_of_predicate(pol.predicate)
+        for a in pol.actions:
+            fields.update(fields_of_action(a))
+        return fields
+    elif isinstance(pol, nc.PolicyUnion):
+        return fields_of_policy(pol.left).union(
+               fields_of_policy(pol.right))
+    elif isinstance(pol, nc.PolicyRestriction):
+        return fields_of_policy(pol.policy).union(
+               fields_of_predicate(pol.predicate))
