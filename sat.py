@@ -35,8 +35,8 @@ ONLY CHECK FOR UNSAT UNLESS YOU'RE MARK
 No observations yet.
 """
 
-from z3.z3 import And, Or, Not, Implies, Function, ForAll, Exists
-from z3.z3 import Consts, Solver, unsat, IntSort, set_option
+from z3.z3 import And, Or, Not, Implies, Function, ForAll
+from z3.z3 import Consts, Solver, unsat, set_option, Ints
 from netcore import HEADERS
 import netcore as nc
 
@@ -46,8 +46,7 @@ set_option(pull_nested_quantifiers=True)
 
 from sat_core import nary_or, nary_and
 from sat_core import HEADER_INDEX, Packet, switch, port, vlan
-from sat_core import make_qpacket
-from sat_core import forwards, equiv_modulo
+from sat_core import forwards, forwards_with
 
 def transfer(topo, p_out, p_in):
     """Build constraint for moving p_out to p_in across an edge."""
@@ -151,31 +150,27 @@ def compiled_correctly(orig, result):
     RETURNS: True or False.  For models and diagnostics use no_new_behaviors and
     no_lost_behaviors.
     """
-    return (simulates(orig, result, ['vlan']) is None and
-            simulates(result, orig, ['vlan']) is None)
+    return (simulates(orig, result) is None and
+            simulates(result, orig) is None)
 
-def simulates(a, b, fields=[]):
-    """Determine if b simulates a up to fields."""
-    used_fields = fields_of_policy(a).union(fields_of_policy(b))
-    QPacket, hs = make_qpacket(used_fields)
-    def eq(p1, p2):
-        return equiv_modulo(fields, p1, p2, hs)
-    p, pp, q, qq = Consts('p pp q qq', QPacket)
+def simulates(a, b, field='vlan'):
+    """Determine if b simulates a up to field."""
+    p, pp = Consts('p pp', Packet)
+    v, vv = Ints('v vv')
 
     solv = Solver()
 
-    # Nate's solution
-    solv.add(And(forwards(a, p, pp, hs),
-             ForAll([q], Or(Not(eq(p, q)),
-                            ForAll([qq], Or(Not(forwards(b, q, qq, hs)),
-                                            Not(eq(pp, qq))))))))
+    solv.add(And(forwards(a, p, pp),
+             ForAll([v, vv], Not(forwards_with(b, p, {field: v},
+                                                  pp, {field: vv})),
+                                               patterns=[v + vv])))
     if solv.check() == unsat:
         return None
     else:
 #       print solv.check()
 #       print solv.model()
         return solv.model(), (
-                              p, pp, q, qq
+                              p, pp
                               ), HEADER_INDEX
 
 def isolated(topo, policy1, policy2):
