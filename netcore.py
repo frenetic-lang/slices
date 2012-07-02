@@ -87,6 +87,18 @@ HEADERS = ['switch',
            'dstport']
 HEADER_FIELDS = set (HEADERS)
 
+def simulate(policy, packet, (switch, port)):
+    """Get resulting located packets, observations."""
+    actions = policy.get_actions(packet, (switch, port))
+    actions = [a for a in actions if a.switch == switch]
+    observations = set()
+    for a in actions:
+        observations.update(a.obs)
+    packets = set()
+    for a in actions:
+        packets.update(a.modify_packet(packet))
+    return (packets, observations)
+
 class Infix:
     """Class to define infix operators like |so|."""
     def __init__(self, function):
@@ -107,15 +119,21 @@ class PhysicalException(Exception):
     pass
 
 class Packet:
-    """A fully-defined network packet, for testing purposes."""
+    """A fully-defined, immutable network packet."""
     def __init__(self, fields):
-        self.fields = fields
+        self._fields = fields
 
     def __getitem__(self, key):
-        return self.fields[key]
+        return self._fields[key]
+    
+    def items(self):
+        return self._fields.items()
+    
+    def __hash__(self):
+       return hash(tuple(sorted(self._fields.iteritems())))
 
     def __eq__(self, other):
-        return self.fields == other.fields
+        return self._fields == other._fields
 
 class Predicate:
     """Top-level abstract class for predicates."""
@@ -600,12 +618,19 @@ def forward(switch, ports):
         ports = [ports]
     return Action(switch, ports=ports)
 
+def observe(labels):
+    if isinstance(labels, int):
+        labels = [labels]
+    return Action(None, obs=set(label))
+
 class Action:
     """Description of a forwarding action, with possible modification."""
     def __init__(self, switch, ports=set(), modify=dict(), obs=set()):
         """
         ARGS:
-            switch: switch on which the ports live
+            switch: switch on which the ports live.  Iff ports is empty, this
+                may be None, signifying an observation of a packet no matter the
+                location.
             ports: ports to which to forward packet
             modify: dictionary of header fields to values, fields that are set
                 will overwrite the packet's fields
@@ -635,11 +660,16 @@ class Action:
             packet: packet to modify
 
         RETURNS:
-            packet modified by this action's modify pattern
+            list of new (packet, loc) with packet modified by this action's
+            modify pattern at each output port of the pattern.
         """
-        new = copy.deepcopy(packet)
-        new.fields.update(self.modify)
-        return (new, (self.switch, self.ports))
+        fields = dict(packet.items())
+        fields.update(self.modify)
+        packet = Packet(fields)
+        lps = []
+        for p in self.ports:
+            lps.append((packet, (self.switch, p)))
+        return lps
 
     def get_physical_rep(self, switch_map, port_map):
         """Return this action mapped to a physical network."""
@@ -677,7 +707,7 @@ class Policy:
 
     @abstractmethod
     def get_actions(self, packet, loc):
-        """Get set of (pkt, loc) this policy generates for a located packet."""
+        """Get set of actions this policy generates for a located packet."""
         pass
 
     def reduce(self):
@@ -795,7 +825,8 @@ class PrimitivePolicy(Policy):
 
     def get_actions(self, packet, loc):
         if self.predicate.match(packet, loc):
-            return self.actions
+            switch = loc[0]
+            return [a for a in self.actions if a.switch == switch]
         else:
             return []
 

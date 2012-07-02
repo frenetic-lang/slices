@@ -68,8 +68,8 @@ def equiv_modulo(fields, p1, p2):
 
     return nary_and(constraints)
 
-def match_of_predicate(pred, pkt, mods):
-    """Build the constraint for pred on pkt."""
+def match_with(pred, pkt, mods):
+    """Build the constraint for pred matching pkt."""
     if isinstance(pred, nc.Top):
         return True
     elif isinstance(pred, nc.Bottom):
@@ -84,24 +84,22 @@ def match_of_predicate(pred, pkt, mods):
                 constraints.append(HEADER_INDEX[field](pkt) == value)
         return nary_and(constraints)
     elif isinstance(pred, nc.Union):
-        left = match_of_predicate(pred.left, pkt, mods)
-        right = match_of_predicate(pred.right, pkt, mods)
+        left = match_with(pred.left, pkt, mods)
+        right = match_with(pred.right, pkt, mods)
         return Or(left, right)
     elif isinstance(pred, nc.Intersection):
-        left = match_of_predicate(pred.left, pkt, mods)
-        right = match_of_predicate(pred.right, pkt, mods)
+        left = match_with(pred.left, pkt, mods)
+        right = match_with(pred.right, pkt, mods)
         return And(left, right)
     elif isinstance(pred, nc.Difference):
-        left = match_of_predicate(pred.left, pkt, mods)
-        right = match_of_predicate(pred.right, pkt, mods)
+        left = match_with(pred.left, pkt, mods)
+        right = match_with(pred.right, pkt, mods)
         return And(left, Not(right))
 
-# TODO(astory): observations
 def modify_packet(action, p_in, in_mods, p_out, out_mods):
     """Build the constraint for action producing p_out from p_in."""
     ports = action.ports
     modify = action.modify
-    obs = action.obs
 
     constraints = []
     if 'switch' in in_mods:
@@ -146,17 +144,32 @@ def modify_packet(action, p_in, in_mods, p_out, out_mods):
     # We add at least two constraints, so constraints is never empty.
     return nary_and(constraints)
 
+def observe_packet(action, packet, mods, obv):
+    """Build the constraint for action observing obv from packet."""
+    obs = action.obs
+
+    constraints = []
+    if 'switch' in mods:
+        constraints.append(mods['switch'] == action.switch)
+    else:
+        constraints.append(HEADER_INDEX['switch'](packet) == action.switch)
+
+    obv_constraints = []
+    for o in obs:
+        obv_constraints.append(obv == o)
+    constraints.append(nary_or(obv_constraints))
+
+    # We add at least two constraints, so constraints is never empty.
+    return nary_and(constraints)
+
 def forwards(policy, p_in, p_out):
     return forwards_with(policy, p_in, {}, p_out, {})
 
 def forwards_with(policy, p_in, in_mods, p_out, out_mods):
-    """Build constraint for policy producing p_in from p_out in one hop.
+    """Build constraint for policy producing p_out from p_in in one hop.
 
     Modifies p_in with all the fields in in_mods
     Modifies p_out with all the fields in out_mods
-
-    headers is the dictionary of header lookup functions.  Defaults to
-    non-quantified packets.
     """
     if isinstance(policy, nc.BottomPolicy):
         # No forwarding happens, fail immediately (unless there's a union above
@@ -173,7 +186,7 @@ def forwards_with(policy, p_in, in_mods, p_out, out_mods):
         # match, we don't want the rule to fire - without this, we can get
         # really weird behavior if the predicate is false over a packet, since
         # False -> x for all x
-        return And(match_of_predicate(pred, p_in, in_mods),
+        return And(match_with(pred, p_in, in_mods),
                    action_constraints)
     elif isinstance(policy, nc.PolicyUnion):
         left = policy.left
@@ -183,7 +196,43 @@ def forwards_with(policy, p_in, in_mods, p_out, out_mods):
     elif isinstance(policy, nc.PolicyRestriction):
         subpolicy = policy.policy
         pred = policy.predicate
-        return And(forwards(subpolicy, p_in, in_mods, p_out, out_mods),
-                   match_of_predicate(pred, p_in, in_mods))
+        return And(forwards_with(subpolicy, p_in, in_mods, p_out, out_mods),
+                   match_with(pred, p_in, in_mods))
+    else:
+        raise Exception('unknown policy type: %s' % policy.__class__)
+
+def observes(policy, packet, observations):
+    return observes_with(policy, packet, {}, observations)
+
+def observes_with(policy, packet, mods, obs):
+    """Build constraint for policy observing observations from p_in in one hop.
+
+    Modifies packet with all the fields in mods
+    """
+    if isinstance(policy, nc.BottomPolicy):
+        # No observing happens, fail immediately (unless there's a union above
+        # us, in which case the Or takes care of it)
+        return False
+    elif isinstance(policy, nc.PrimitivePolicy):
+        pred = policy.predicate
+        actions = policy.actions
+        # If the predicate matches, any one of the actions may fire.
+        action_constraints = nary_or([observe_packet(a, packet, mods, obs)
+                                      for a in actions])
+        # Use and here rather than implies because if the input packet doesn't
+        # match, we don't want the rule to fire - without this, we can get
+        # really weird behavior if the predicate is false over a packet, since
+        # False -> x for all x
+        return And(match_with(pred, packet, mods), action_constraints)
+    elif isinstance(policy, nc.PolicyUnion):
+        left = policy.left
+        right = policy.right
+        return Or(observes_with(left, packet, mods, obs),
+                  observes_with(right, packet, mods, obs))
+    elif isinstance(policy, nc.PolicyRestriction):
+        subpolicy = policy.policy
+        pred = policy.predicate
+        return And(observes_with(subpolicy, packet, mods, obs),
+                   match_with(pred, packet, mods))
     else:
         raise Exception('unknown policy type: %s' % policy.__class__)

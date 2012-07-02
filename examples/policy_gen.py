@@ -30,7 +30,7 @@
 ################################################################################
 """Tools to generate policies"""
 
-from netcore import forward, inport, nary_policy_union, then
+from netcore import forward, inport, nary_policy_union, then, Top
 
 def flood(topo, all_ports=False):
     """Construct a policy that floods packets out each port on each switch.
@@ -51,3 +51,7 @@ def flood(topo, all_ports=False):
                 pol = inport(switch, port) |then| forward(switch, other_port)
                 policies.append(pol)
     return nary_policy_union(policies).reduce()
+
+def observe_all(label):
+    """Construct a policy that observes all packets and emits label."""
+    return Top() |then| Action(None, obs=set(label))

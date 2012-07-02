@@ -36,7 +36,7 @@ No observations yet.
 """
 
 from z3.z3 import And, Or, Not, Implies, Function, ForAll
-from z3.z3 import Consts, Solver, unsat, set_option, Ints
+from z3.z3 import Const, Consts, Solver, unsat, set_option, Ints
 from netcore import HEADERS
 import netcore as nc
 
@@ -46,7 +46,7 @@ set_option(pull_nested_quantifiers=True)
 
 from sat_core import nary_or, nary_and
 from sat_core import HEADER_INDEX, Packet, switch, port, vlan
-from sat_core import forwards, forwards_with
+from sat_core import forwards, forwards_with, observes, observes_with
 
 def transfer(topo, p_out, p_in):
     """Build constraint for moving p_out to p_in across an edge."""
@@ -136,42 +136,55 @@ def not_empty(policy):
 def compiled_correctly(orig, result):
     """Determine if result is a valid compilation of orig.
 
-    Performs the following tests:
-    O is the original policy
-    R is the resulting policy
-    ~ means equivalent up to vlans
-
-    No lost behaviors:
-    p -O-> p' => \exists q, q' . p ~ q /\ p' ~ q' /\ q -R-> q'
-
-    No new behaviors:
-    p -R-> p' => \exists q, q' . p ~ q /\ p' ~ q' /\ q -O-> q'
-
     RETURNS: True or False.  For models and diagnostics use no_new_behaviors and
     no_lost_behaviors.
     """
-    return (simulates(orig, result) is None and
-            simulates(result, orig) is None)
+    return (simulates(orig, result) and simulates(result, orig))
 
 def simulates(a, b, field='vlan'):
     """Determine if b simulates a up to field."""
+    return (simulates_forwards(a, b, field=field) is None and
+            simulates_observes(a, b, field=field) is None)
+
+def simulates_forwards(a, b, field='vlan'):
+    """Determine if b simulates a up to field."""
     p, pp = Consts('p pp', Packet)
     v, vv = Ints('v vv')
+    # Z3 emits a warning about not finding a pattern for our quantification.
+    # This is fine, so ignore it.
+    set_option('WARNING', False)
 
     solv = Solver()
 
     solv.add(And(forwards(a, p, pp),
              ForAll([v, vv], Not(forwards_with(b, p, {field: v},
                                                   pp, {field: vv})),
-                                               patterns=[])))
+                    patterns=[])))
     if solv.check() == unsat:
+        set_option('WARNING', True)
         return None
     else:
-#       print solv.check()
-#       print solv.model()
-        return solv.model(), (
-                              p, pp
-                              ), HEADER_INDEX
+        set_option('WARNING', True)
+        return solv.model(), (p, pp), HEADER_INDEX
+
+def simulates_observes(a, b, field='vlan'):
+    p = Const('p', Packet)
+    o, v = Ints('o v')
+    # Z3 emits a warning about not finding a pattern for our quantification.
+    # This is fine, so ignore it.
+    set_option('WARNING', False)
+
+    solv = Solver()
+
+    solv.add(And(observes(a, p, o),
+             ForAll([v], Not(observes_with(b, p, {field: v}, o)),
+                    patterns=[])))
+    if solv.check() == unsat:
+        set_option('WARNING', True)
+        return None
+    else:
+        set_option('WARNING', True)
+        return solv.model(), (p), HEADER_INDEX
 
 def isolated(topo, policy1, policy2):
     """Determine if policy1 is isolated from policy2.
