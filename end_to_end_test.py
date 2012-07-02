@@ -57,7 +57,8 @@ import networkx as nx
 import netcore as nc
 import os
 import unittest
-from test_util import linear, linear_all_ports, k10_nodes, k10, k4_nodes, k4
+from test_util import linear, linear_all_ports, linear_hosts
+from test_util import k10_nodes, k10, k4_nodes, k4, k4hosts
 
 verbose = 'VERBOSE_TESTS' in os.environ
 
@@ -95,6 +96,16 @@ class TestCompile(unittest.TestCase):
         self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
 
+    def testHostsCompile(self):
+        topo, combined = linear_hosts((0, 1, 2, 3), (0, 1, 2, 3))
+        policies = [p for _, p in combined]
+        compiled = cp.compile_slices(combined)
+        self.assertFalse(sat.isolated(topo, policies[0], policies[1]))
+        self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
+
+        self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
+        self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
+
 class TestEdgeCompile(unittest.TestCase):
     def testBasicCompile(self):
         topo, policies = linear((0, 1, 2, 3), (0, 1, 2, 3))
@@ -102,6 +113,15 @@ class TestEdgeCompile(unittest.TestCase):
         combined = zip(slices, policies)
         compiled = ec.compile_slices(topo, combined)
         self.assertFalse(sat.isolated(topo, policies[0], policies[1]))
+        self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
+        self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
+        self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
+
+        topo, policies = linear((0, 1, 2), (2, 3))
+        slices = [slicing.ident_map_slice(topo, {}) for p in policies]
+        combined = zip(slices, policies)
+        compiled = ec.compile_slices(topo, combined)
+        self.assertTrue(sat.isolated(topo, policies[0], policies[1]))
         self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
         self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
@@ -133,6 +153,15 @@ class TestEdgeCompile(unittest.TestCase):
         self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
 
+    def testHostsCompile(self):
+        topo, combined = linear_hosts((0, 1, 2, 3), (0, 1, 2, 3))
+        policies = [p for _, p in combined]
+        compiled = ec.compile_slices(topo, combined)
+        self.assertFalse(sat.isolated(topo, policies[0], policies[1]))
+        self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
+        self.assertTrue(sat.compiled_correctly(policies[0], compiled[0]))
+        self.assertTrue(sat.compiled_correctly(policies[1], compiled[1]))
+
 class TestCompleteGraph(unittest.TestCase):
     def setUp(self):
         self.k10topo, self.k10combined = k10()
@@ -141,6 +170,9 @@ class TestCompleteGraph(unittest.TestCase):
         self.k4topo, self.k4combined = k4()
         self.k4policies = [p for _, p in self.k4combined]
 
+        self.k4hosts_topo, self.k4hosts_combined = k4hosts()
+        self.k4hosts_policies = [p for _, p in self.k4hosts_combined]
+
     @unittest.skipIf('EXPENSIVE_TESTS' not in os.environ, 'expensive')
     def testExpensivePhysEquiv(self):
         self.physEquiv(k10_nodes, self.k10policies)
@@ -148,12 +180,18 @@ class TestCompleteGraph(unittest.TestCase):
     def testCheapPhysEquiv(self):
         self.physEquiv(k4_nodes, self.k4policies)
 
+    def testHostsPhysEquiv(self):
+        self.physEquiv(k4_nodes, self.k4hosts_policies)
+
     @unittest.skipIf('EXPENSIVE_TESTS' not in os.environ, 'expensive')
     def testExpensivePhysSep(self):
         self.physSep(k10_nodes, self.k10topo, self.k10policies)
 
     def testCheapPhysSep(self):
         self.physSep(k4_nodes, self.k4topo, self.k4policies)
+    
+    def testHostsPhysSep(self):
+        self.physSep(k4_nodes, self.k4hosts_topo, self.k4hosts_policies)
 
     @unittest.skipIf('EXPENSIVE_TESTS' not in os.environ, 'expensive')
     def testExpensiveCompile(self):
@@ -162,12 +200,18 @@ class TestCompleteGraph(unittest.TestCase):
     def testCheapCompile(self):
         self.sliceCompile(k4_nodes, self.k4topo, self.k4combined)
 
+    def testHostsCompile(self):
+        self.sliceCompile(k4_nodes, self.k4hosts_topo, self.k4hosts_combined)
+
     @unittest.skipIf('EXPENSIVE_TESTS' not in os.environ, 'expensive')
     def testExpensiveEdgeCompile(self):
         self.edgeCompile(k10_nodes, self.k10topo, self.k10combined)
 
     def testCheapEdgeCompile(self):
         self.edgeCompile(k4_nodes, self.k4topo, self.k4combined)
+
+    def testHostsCompile(self):
+        self.edgeCompile(k4_nodes, self.k4hosts_topo, self.k4hosts_combined)
 
     def physEquiv(self, nodes, policies):
         for i in range(0, len(policies)):
@@ -188,6 +232,8 @@ class TestCompleteGraph(unittest.TestCase):
             for j in range(len(policies)):
                 if verbose:
                     print "testing %s with %s." % (nodes[i], nodes[j])
+                    print str(policies[i])
+                    print str(policies[j])
                 result = sat.isolated(topo, policies[i], policies[j])
                 if len(set(nodes[i]).intersection(nodes[j])) > 1:
                     self.assertFalse(result)

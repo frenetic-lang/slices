@@ -59,8 +59,7 @@ def blue_slice(p_topo):
             else:
                 preds[(s,ep)] = nc.Header({"dstport": 80})
 
-    return slicing.Slice(l_topo, p_topo, s_map, p_map, preds,
-                         map_end_hosts=True)
+    return slicing.Slice(l_topo, p_topo, s_map, p_map, preds)
 
 def green_slice(p_topo):
     l_topo = nxtopo.NXTopo()
@@ -79,8 +78,7 @@ def green_slice(p_topo):
     add_to_port_map("G1","G3",p_map,s_map,l_topo,p_topo)
     add_to_port_map("G2","G3",p_map,s_map,l_topo,p_topo)
 
-    return slicing.Slice(l_topo, p_topo, s_map, p_map, {},
-                         map_end_hosts=True)
+    return slicing.Slice(l_topo, p_topo, s_map, p_map, {})
 
 def red_slice(p_topo):
     l_topo = nxtopo.NXTopo()
@@ -117,8 +115,7 @@ def red_slice(p_topo):
             else:
                 preds[(s,ep)] = nc.Header({"dstport": 80})
 
-    return slicing.Slice(l_topo, p_topo, s_map, p_map, preds,
-                         map_end_hosts=True)
+    return slicing.Slice(l_topo, p_topo, s_map, p_map, preds)
 
 def add_to_port_map(s1, s2, p_map, s_map, l_topo, p_topo):
     s1p = s_map[s1]

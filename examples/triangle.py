@@ -63,9 +63,9 @@ def get_slices():
     blue_ports  = util.ports_of_topo(blue_topo)
     red_ports   = util.ports_of_topo(red_topo)
 
-    g_s_map = util.id_map(green_nodes)
-    b_s_map = util.id_map(blue_nodes)
-    r_s_map = util.id_map(red_nodes)
+    g_s_map = util.id_map(green_topo.switches())
+    b_s_map = util.id_map(blue_topo.switches())
+    r_s_map = util.id_map(red_topo.switches())
 
     g_p_map = util.id_map(green_ports)
     b_p_map = util.id_map(blue_ports)

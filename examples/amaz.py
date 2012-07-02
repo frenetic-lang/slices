@@ -87,8 +87,7 @@ def getSlice(l_sLeft, l_sMid, l_sRight, l_hLeft, l_hRight, adj, policy, p_topo):
     ep2 = (l_sRight, l_topo.edge_ports(l_sRight)[0])
 
     slic = slicing.Slice(l_topo, p_topo, s_map, p_map,
-                         {ep1 : policy, ep2 : policy},
-                         map_end_hosts=True)
+                         {ep1 : policy, ep2 : policy})
 
     return slic
 

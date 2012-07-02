@@ -30,6 +30,8 @@
 ################################################################################
 """Tools to assign vlan tags to network slices."""
 
+from util import edges_of_topo, map_edges
+
 class VlanException(Exception):
     """Exception to represent failure to map to VLAN tags."""
     pass
@@ -44,40 +46,6 @@ def sequential(slices):
         output[slic] = vlan
         vlan += 1
     return output
-
-def links(topo, sid):
-    """Get a list of ((s,p), (s,p)) for all outgoing links from this switch."""
-    switch = topo.node[sid]
-    return [((sid, our_port), (them, their_port))
-            for our_port, (them, their_port) in switch['port'].items()
-            # If their_port == 0, they're an end host, not a switch.
-            # We don't care about end hosts.
-            if their_port != 0]
-
-def edges_of_topo(topo, undirected=False):
-    """Get all switch-switch edges in a topo, in links format."""
-    # Need to dereference switch id to get full object
-    lnks = []
-    for switch in topo.switches():
-        lnks.extend(links(topo, switch))
-    if undirected:
-        lnks_new = set()
-        for (source, sink) in lnks:
-            if (sink, source) not in lnks_new:
-                lnks_new.add((source, sink))
-        return lnks_new
-    else:
-        return lnks
-
-def map_edges(lnks, switch_map, port_map):
-    """Map ((s, p), (s, p)) edges according to the two maps."""
-    mapped = []
-    for (s1, p1), (s2, p2) in lnks:
-        # only include the port result from the port map, don't rely on the
-        # switch recorded there
-        mapped.append(((switch_map[s1], port_map[(s1, p1)][1]),
-                       (switch_map[s2], port_map[(s2, p2)][1])))
-    return mapped
 
 # TODO(astory): deal with unidirectional ports.  This should really be done by
 # just looking at incoming ports, but it gets a bit more complicated because now

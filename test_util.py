@@ -31,16 +31,51 @@
 import networkx as nx
 import nxtopo
 import slicing
+import netcore as nc
 from examples import policy_gen
 
 def linear(*linear_nodes):
-    """Linear graph on four nodes, slices overlap on middle 2 nodes."""
+    """Linear graph on four nodes, slices from input."""
     topo = nxtopo.from_graph(nx.path_graph(4))
     topo.finalize()
 
     topos = [topo.subgraph(nodes) for nodes in linear_nodes]
     policies = [policy_gen.flood(t) for t in topos]
     return topo, policies
+
+def linear_hosts(*linear_nodes):
+    """Returns topo, [(slice, policy)]"""
+    topo = nxtopo.from_graph(nx.path_graph(4))
+    nodes = [set(ns) for ns in linear_nodes]
+    for n in topo.nodes():
+        h1 = 100 + n*10 + 1
+        h2 = 100 + n*10 + 2
+        topo.add_host(h1)
+        topo.add_host(h2)
+        topo.add_link(n, h1)
+        topo.add_link(n, h2)
+        for ns in nodes:
+            if n in ns:
+                ns.update([h1, h2])
+    topo.finalize()
+
+    edge_policies = []
+    for ns in linear_nodes:
+        predicates = {}
+        for n in ns:
+            h1 = 100 + n*10 + 1
+            h2 = 100 + n*10 + 2
+            h1_port = topo.node[h1]['port'][0]
+            h2_port = topo.node[h2]['port'][0]
+            predicates[h1_port] = nc.Top()
+            predicates[h2_port] = nc.Top()
+        edge_policies.append(predicates)
+
+    topos = [topo.subgraph(ns) for ns in nodes]
+    slices = [slicing.ident_map_slice(t, pol)
+              for t, pol in zip(topos, edge_policies)]
+    combined = zip(slices, [policy_gen.flood(t) for t in topos])
+    return (topo, combined)
 
 def linear_all_ports(*linear_nodes):
     """Linear graph on four nodes with reflexive forwarding."""
@@ -90,6 +125,41 @@ def k4():
 
     topos = [topo.subgraph(nodes) for nodes in k4_nodes]
     edge_policies = [{} for t in topos]
+    slices = [slicing.ident_map_slice(t, pol)
+              for t, pol in zip(topos, edge_policies)]
+    combined = zip(slices, [policy_gen.flood(t) for t in topos])
+    return (topo, combined)
+
+def k4hosts():
+    """K4 complete graph with two hosts on each node."""
+    topo = nxtopo.from_graph(nx.complete_graph(4))
+    nodes = [set(ns) for ns in k4_nodes]
+    for n in topo.nodes():
+        h1 = 100 + n*10 + 1
+        h2 = 100 + n*10 + 2
+        topo.add_host(h1)
+        topo.add_host(h2)
+        topo.add_link(n, h1)
+        topo.add_link(n, h2)
+        for ns in nodes:
+            if n in ns:
+                ns.update([h1, h2])
+    topo.finalize()
+
+    edge_policies = []
+    for ns in k4_nodes:
+        predicates = {}
+        for n in ns:
+            h1 = 100 + n*10 + 1
+            h2 = 100 + n*10 + 2
+            h1_port = topo.node[h1]['port'][0]
+            h2_port = topo.node[h2]['port'][0]
+            predicates[h1_port] = nc.Top()
+            predicates[h2_port] = nc.Top()
+        edge_policies.append(predicates)
+
+    topos = [topo.subgraph(ns) for ns in nodes]
+
     slices = [slicing.ident_map_slice(t, pol)
               for t, pol in zip(topos, edge_policies)]
     combined = zip(slices, [policy_gen.flood(t) for t in topos])

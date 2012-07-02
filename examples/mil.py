@@ -59,8 +59,7 @@ def get_slices():
             policy = netcore.Header({'ethtype': 0x86DD})
 
         slic = slicing.Slice(l_topo, p_topo, s_map, p_map,
-                             {ep1 : policy, ep2 : policy},
-                             map_end_hosts=True)
+                             {ep1 : policy, ep2 : policy})
         slices.append(slic)
 
     slices.append(getIsolatedFella(p_topo))
@@ -79,8 +78,7 @@ def getIsolatedFella(p_topo):
     p_port = (5, p_topo.node[5]['ports'][10])
 
     return slicing.Slice(l_topo, p_topo, {35:5}, {l_port:p_port},
-                         {l_port:netcore.Header({'srcport': 80})},
-                         map_end_hosts=True)
+                         {l_port:netcore.Header({'srcport': 80})})
 
 def addToPortMap(s1, s2, p_map, s_map, l_topo, p_topo):
     s1p = s_map[s1]

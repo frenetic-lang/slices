@@ -32,6 +32,7 @@
 import examples.amaz as az
 import vlan
 import unittest
+import util
 
 topo, slices = az.get_slices()
 
@@ -50,7 +51,7 @@ class TestVlanAssignment(unittest.TestCase):
         self.assertEqual(len(slices), len(set(assigned.keys())))
 
     def test_get_links_internal(self):
-        links = vlan.links(topo, 1)
+        links = util.links(topo, 1)
         switches = [(s1, s2) for (s1, p1), (s2, p2) in links]
 
         # Verify all the expected switch links
@@ -60,7 +61,7 @@ class TestVlanAssignment(unittest.TestCase):
             self.assertEqual((s2, p2), topo.node[s1]['port'][p1])
 
     def test_get_links_external(self):
-        links = vlan.links(topo, 3)
+        links = util.links(topo, 3)
         switches = [(s1, s2) for (s1, p1), (s2, p2) in links]
 
         # Verify all the expected switch links
