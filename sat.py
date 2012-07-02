@@ -163,7 +163,7 @@ def simulates(a, b, field='vlan'):
     solv.add(And(forwards(a, p, pp),
              ForAll([v, vv], Not(forwards_with(b, p, {field: v},
                                                   pp, {field: vv})),
-                                               patterns=[v + vv])))
+                                               patterns=[])))
     if solv.check() == unsat:
         return None
     else:
