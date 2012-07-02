@@ -232,8 +232,9 @@ class TestPredicate(unittest.TestCase):
 class TestAction(unittest.TestCase):
     def test_modify_returns_new_packet(self):
         action = nc.Action(1, ports=[1], modify={})
-        modified, (switch, port) = action.modify_packet(full_packet)
-        self.assertEqual(full_packet, modified)
+        result = action.modify_packet(full_packet)
+        modified, (switch, port) = result[0]
+        self.assertEqual([(modified, (1, 1))], result)
         self.assertFalse(full_packet is modified)
 
     def test_modify(self):
@@ -242,8 +243,9 @@ class TestAction(unittest.TestCase):
         expected['srcmac'] = -1
         expected['ethtype'] = -3
 
-        modified, (switch, port) = action.modify_packet(full_packet)
-        self.assertEqual(expected, modified.fields)
+        result = action.modify_packet(full_packet)
+        modified, (switch, port) = result[0]
+        self.assertEqual(expected, modified._fields)
 
     def test_get_physical(self):
         switch_map = {1: 100}
@@ -277,8 +279,12 @@ class TestPolicy(unittest.TestCase):
 
         policy = header |then| actions
 
-        self.assertEqual([], policy.get_actions(nega_packet, (1, 2)))
-        self.assertEqual(actions, policy.get_actions(full_packet, (1,2)))
+        self.assertItemsEqual([], policy.get_actions(nega_packet, (1, 2)))
+        self.assertItemsEqual([nc.Action(1)], policy.get_actions(full_packet, (1,2)))
+
+        actions = [nc.Action(1), nc.Action(1, ports=[2])]
+        policy = header |then| actions
+        self.assertItemsEqual(actions, policy.get_actions(full_packet, (1,2)))
 
 if __name__ == '__main__':
     unittest.main()

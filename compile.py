@@ -101,7 +101,6 @@ def compile_slices(combined, assigner=vl.sequential, verbose=False):
         inport_policy.get_physical_rep(slic.node_map, slic.port_map)
         # Take their union
         safe_inport_policy = safe_policy + inport_policy
-        safe_inport_policy.get_physical_rep(slic.node_map, slic.port_map)
 
         # Modify the result to strip the vlan tag from outbound ports
         # Note that this should be the last step.  If our policy takes an

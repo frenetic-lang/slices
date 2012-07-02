@@ -35,6 +35,21 @@ class SatTest(unittest.TestCase):
         r = BottomPolicy()
         self.assertIsNone(sat.simulates_observes(o, r))
 
+        o = Header({'switch': 1, 'port': 1}) |then| Action(1, [2], obs=[0])
+        r = Header({'switch': 1, 'port': 1, 'vlan': 1}) |then|\
+            Action(1, [2], obs=[0])
+        self.assertIsNone(sat.simulates_observes(o, r))
+
+        o = Header({'switch': 1, 'port': 1}) |then| Action(1, [2])
+        r = Header({'switch': 1, 'port': 1, 'vlan': 1}) |then|\
+            Action(1, [2], obs=[0])
+        self.assertIsNone(sat.simulates_observes(o, r))
+
+        o = Header({'switch': 1, 'port': 1}) |then| Action(1, [2], obs=[0])
+        r = Header({'switch': 1, 'port': 1, 'vlan': 1}) |then|\
+            Action(1, [2])
+        self.assertIsNotNone(sat.simulates_observes(o, r))
+
     def test_compiled_correctly(self):
         o = Header({'switch': 2, 'port': 2}) |then| Action(2, [1])
         r = Header({'switch': 2, 'port': 2}) |then| Action(2, [1])

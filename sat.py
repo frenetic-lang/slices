@@ -179,6 +179,9 @@ def simulates_observes(a, b, field='vlan'):
     solv.add(And(observes(a, p, o),
              ForAll([v], Not(observes_with(b, p, {field: v}, o)),
                     patterns=[])))
+
+    #import IPython.Shell; IPython.Shell.IPShellEmbed(argv=[])()
+
     if solv.check() == unsat:
         set_option('WARNING', True)
         return None

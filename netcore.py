@@ -618,19 +618,12 @@ def forward(switch, ports):
         ports = [ports]
     return Action(switch, ports=ports)
 
-def observe(labels):
-    if isinstance(labels, int):
-        labels = [labels]
-    return Action(None, obs=set(label))
-
 class Action:
     """Description of a forwarding action, with possible modification."""
     def __init__(self, switch, ports=set(), modify=dict(), obs=set()):
         """
         ARGS:
-            switch: switch on which the ports live.  Iff ports is empty, this
-                may be None, signifying an observation of a packet no matter the
-                location.
+            switch: switch on which the ports live.
             ports: ports to which to forward packet
             modify: dictionary of header fields to values, fields that are set
                 will overwrite the packet's fields
@@ -642,7 +635,8 @@ class Action:
         self.obs = obs
 
     def __str__(self):
-        return "%s: %s -> %s" % (self.switch, self.modify, self.ports)
+        return "%s: %s -%s-> %s" % (self.switch, self.modify,
+                                    list(self.obs), list(self.ports))
 
     def __repr__(self):
         return self.__str__()
@@ -675,7 +669,7 @@ class Action:
         """Return this action mapped to a physical network."""
         # Only return the port number, not the (switch, port) pair
         p_ports = [port_map[(self.switch, p)][1] for p in self.ports]
-        return Action(switch_map[self.switch], p_ports, self.modify)
+        return Action(switch_map[self.switch], p_ports, self.modify, self.obs)
 
 class Policy:
     """Top-level abstract description of a static network program."""

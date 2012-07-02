@@ -40,7 +40,7 @@ def linear(*linear_nodes):
     topo.finalize()
 
     topos = [topo.subgraph(nodes) for nodes in linear_nodes]
-    policies = [policy_gen.flood(t) for t in topos]
+    policies = [policy_gen.flood_observe(t) for t in topos]
     return topo, policies
 
 def linear_hosts(*linear_nodes):
@@ -74,7 +74,7 @@ def linear_hosts(*linear_nodes):
     topos = [topo.subgraph(ns) for ns in nodes]
     slices = [slicing.ident_map_slice(t, pol)
               for t, pol in zip(topos, edge_policies)]
-    combined = zip(slices, [policy_gen.flood(t) for t in topos])
+    combined = zip(slices, [policy_gen.flood_observe(t) for t in topos])
     return (topo, combined)
 
 def linear_all_ports(*linear_nodes):
@@ -83,7 +83,7 @@ def linear_all_ports(*linear_nodes):
     topo.finalize()
 
     topos = [topo.subgraph(nodes) for nodes in linear_nodes]
-    policies = [policy_gen.flood(t, all_ports=True) for t in topos]
+    policies = [policy_gen.flood_observe(t, all_ports=True) for t in topos]
     return topo, policies
 
 k10_nodes = [
@@ -108,7 +108,7 @@ def k10():
     edge_policies = [{} for t in topos]
     slices = [slicing.ident_map_slice(t, pol)
               for t, pol in zip(topos, edge_policies)]
-    combined = zip(slices, [policy_gen.flood(t) for t in topos])
+    combined = zip(slices, [policy_gen.flood_observe(t) for t in topos])
     return (topo, combined)
 
 k4_nodes = [
@@ -127,7 +127,7 @@ def k4():
     edge_policies = [{} for t in topos]
     slices = [slicing.ident_map_slice(t, pol)
               for t, pol in zip(topos, edge_policies)]
-    combined = zip(slices, [policy_gen.flood(t) for t in topos])
+    combined = zip(slices, [policy_gen.flood_observe(t) for t in topos])
     return (topo, combined)
 
 def k4hosts():
@@ -162,7 +162,7 @@ def k4hosts():
 
     slices = [slicing.ident_map_slice(t, pol)
               for t, pol in zip(topos, edge_policies)]
-    combined = zip(slices, [policy_gen.flood(t) for t in topos])
+    combined = zip(slices, [policy_gen.flood_observe(t) for t in topos])
     return (topo, combined)
 
 if __name__ == '__main__':
