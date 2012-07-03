@@ -165,6 +165,13 @@ class Predicate:
         return self.__str__()
 
     @abstractmethod
+    def __eq__(self, other):
+        pass
+
+    def __ne__(self, other):
+        return not self == other
+
+    @abstractmethod
     def reduce(self):
         """Return a copy with removed redundencies."""
         pass
@@ -700,6 +707,13 @@ class Policy:
         return self.__str__()
 
     @abstractmethod
+    def __eq__(self, other):
+        pass
+
+    def __ne__(self, other):
+        return not self == other
+
+    @abstractmethod
     def get_actions(self, packet, loc):
         """Get set of actions this policy generates for a located packet."""
         pass
@@ -777,7 +791,8 @@ class PrimitivePolicy(Policy):
         return "PrimitivePolicy\n|%s\n|%s" % (self.predicate, self.actions)
 
     def __eq__(self, other):
-        return self.predicate == other.predicate and \
+        return isinstance(other, PrimitivePolicy) and \
+            self.predicate == other.predicate and \
             self.actions == other.actions
 
     def reduce(self):
