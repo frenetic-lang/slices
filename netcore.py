@@ -842,6 +842,11 @@ class PolicyUnion(Policy):
         right_lines = ['|' + s for s in right_s.split('\n')]
         return "\n".join(["PolicyUnion"] + left_lines + right_lines)
 
+    def __eq__(self, other):
+        return (isinstance(other, PolicyUnion) and
+                ((self.left == other.left and self.right == other.right) or
+                 (self.right == other.left and self.left == other.right)))
+
     def reduce(self):
         r_left = self.left.reduce()
         r_right = self.right.reduce()
@@ -913,6 +918,10 @@ class PolicyRestriction(Policy):
         left_lines  = ['|' + s for s in left_s.split('\n')]
         right_lines = ['|' + s for s in right_s.split('\n')]
         return "\n".join(["PolicyRestriction"] + left_lines + right_lines)
+
+    def __eq__(self, other):
+        return (isinstance(other, PolicyRestriction) and
+                self.policy == other.policy and self.predicate == other.predicate)
 
     def reduce(self):
         r_pred = self.predicate.reduce()
