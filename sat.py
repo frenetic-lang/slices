@@ -133,21 +133,39 @@ def not_empty(policy):
     else:
         return (s.model(), (p_in, p_out), HEADER_INDEX)
 
-def compiled_correctly(orig, result):
+def compiled_correctly(topo, orig, result):
     """Determine if result is a valid compilation of orig.
 
-    RETURNS: True or False.  For models and diagnostics use no_new_behaviors and
-    no_lost_behaviors.
-    """
-    return (simulates(orig, result) and simulates(result, orig))
+    Preconditions:
+        Topo is the relevant topology
+        orig is vlan-agnostic.  That is:
+            ForAll v, simulates(orig, orig % {vlan: v})
 
-def simulates(a, b, field='vlan'):
-    """Determine if b simulates a up to field."""
+    RETURNS: True or False.
+    """
+    print simulates(topo, orig, result)
+    print simulates(topo, result, orig)
+    print one_per_edge(topo, result)
+
+    return (simulates(topo, orig, result) and
+            simulates(topo, result, orig) and
+            one_per_edge(topo, result) is None)
+
+def simulates(topo, a, b, field='vlan'):
+    """Determine if b simulates a up to field.
+    
+    This ensures all the observations, 1-hop and 2-hop paths are equivalent.  It
+    DOES NOT ensure that b is a sane compilation; this requires that b only uses
+    one vlan, but we don't want to fail in the general case where b might be the
+    source, not the compilation target, so you need to check one_per_edge after
+    calling this to ensure compilation correctness.
+    """
     return (simulates_forwards(a, b, field=field) is None and
-            simulates_observes(a, b, field=field) is None)
+            simulates_observes(a, b, field=field) is None and
+            simulates_forwards2(topo, a, b, field=field) is None)
 
 def simulates_forwards(a, b, field='vlan'):
-    """Determine if b simulates a up to field."""
+    """Determine if b simulates a up to field on one hop."""
     p, pp = Consts('p pp', Packet)
     v, vv = Ints('v vv')
     # Z3 emits a warning about not finding a pattern for our quantification.
@@ -188,6 +206,60 @@ def simulates_observes(a, b, field='vlan'):
     else:
         set_option('WARNING', True)
         return solv.model(), (p), HEADER_INDEX
+
+def simulates_forwards2(topo, a, b, field='vlan'):
+    """Determine if b simulates a up to field on two hop on topo."""
+    p, pp, q, qq = Consts('p pp q qq', Packet)
+    v, vv, vvv = Ints('v vv, vvv')
+    # Z3 emits a warning about not finding a pattern for our quantification.
+    # This is fine, so ignore it.
+    set_option('WARNING', False)
+
+    solv = Solver()
+
+    # This case breaks the And inside the ForAll because they're both False and
+    # z3 can't handle that.  
+    # However, it does mean that they simulate each other, because neither
+    # forwards packets, so just short-circuit.
+    if forwards(b, p, pp) is False and forwards(b, q, qq) is False:
+        return None
+    c = And(forwards(a, p, pp), transfer(topo, pp, q), forwards(a, q, qq),
+            ForAll([v, vv, vvv],
+                   Not(And(forwards_with(b, p, {field: v}, pp, {field: vv}),
+                           forwards_with(b, q, {field: vv}, qq, {field: vvv}))))
+           )
+
+    solv.add(c)
+    if solv.check() == unsat:
+        set_option('WARNING', True)
+        return None
+    else:
+        set_option('WARNING', True)
+        return solv.model(), (p, pp), HEADER_INDEX
+
+def one_per_edge(topo, pol, field='vlan'):
+    """Determine if pol only uses one value of field on each internal edge.
+    
+    We don't care about external edges because they never have the problem of
+    preventing tiling of two-node connectivity since this slice never reads
+    packets sent to them.
+    """
+
+    p, pp, q, qq = Consts('p pp q qq', Packet)
+    r, rr, s, ss = Consts('r rr s ss', Packet)
+
+    solv = Solver()
+    solv.add(forwards(pol, p, pp))
+    solv.add(transfer(topo, pp, r))
+    solv.add(forwards(pol, r, rr))
+    solv.add(forwards(pol, q, qq))
+    solv.add(switch(pp) == switch(qq))
+    solv.add(port(pp) == port(qq))
+    solv.add(HEADER_INDEX[field](pp) != HEADER_INDEX[field](qq))
+    if solv.check() == unsat:
+        return None
+    else:
+        return solv.model(), (p, pp), HEADER_INDEX
 
 def isolated(topo, policy1, policy2):
     """Determine if policy1 is isolated from policy2.
