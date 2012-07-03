@@ -63,7 +63,6 @@ from test_util import k10_nodes, k10, k4_nodes, k4, k4hosts
 
 verbose = 'VERBOSE_TESTS' in os.environ
 
-@unittest.skip('')
 class TestVerify(unittest.TestCase):
     def testBasicOverlap(self):
         topo, policies = linear((0, 1, 2), (1, 2, 3))
@@ -86,7 +85,6 @@ class TestVerify(unittest.TestCase):
         self.assertIsNotNone(sat.not_empty(policies[0]))
         self.assertIsNotNone(sat.not_empty(policies[1]))
 
-@unittest.skip('')
 class TestCompile(unittest.TestCase):
     def testBasicCompile(self):
         topo, policies = linear((0, 1, 2, 3), (0, 1, 2, 3))
@@ -110,7 +108,6 @@ class TestCompile(unittest.TestCase):
         self.assertTrue(sat.compiled_correctly(topo, policies[1], compiled[1]))
 
 class TestEdgeCompile(unittest.TestCase):
-    @unittest.skip('')
     def testBasicCompile(self):
         topo, policies = linear((0, 1, 2, 3), (0, 1, 2, 3))
         slices = [slicing.ident_map_slice(topo, {}) for p in policies]
@@ -168,7 +165,6 @@ class TestEdgeCompile(unittest.TestCase):
         self.assertIsNone(sat.one_per_edge(topo, compiled))
         self.assertTrue(sat.compiled_correctly(topo, policy, compiled))
 
-    @unittest.skip('')
     def testHostsCompile(self):
         topo, combined = linear_hosts((0, 1, 2, 3), (0, 1, 2, 3))
         policies = [p for _, p in combined]
@@ -193,11 +189,9 @@ class TestCompleteGraph(unittest.TestCase):
     def testExpensivePhysEquiv(self):
         self.physEquiv(k10_nodes, self.k10policies)
 
-    @unittest.skip('')
     def testCheapPhysEquiv(self):
         self.physEquiv(k4_nodes, self.k4policies)
 
-    @unittest.skip('')
     def testHostsPhysEquiv(self):
         self.physEquiv(k4_nodes, self.k4hosts_policies)
 
@@ -205,11 +199,9 @@ class TestCompleteGraph(unittest.TestCase):
     def testExpensivePhysSep(self):
         self.physSep(k10_nodes, self.k10topo, self.k10policies)
 
-    @unittest.skip('')
     def testCheapPhysSep(self):
         self.physSep(k4_nodes, self.k4topo, self.k4policies)
     
-    @unittest.skip('')
     def testHostsPhysSep(self):
         self.physSep(k4_nodes, self.k4hosts_topo, self.k4hosts_policies)
 
@@ -217,11 +209,9 @@ class TestCompleteGraph(unittest.TestCase):
     def testExpensiveCompile(self):
         self.sliceCompile(k10_nodes, self.k10topo, self.k10combined)
 
-    @unittest.skip('')
     def testCheapCompile(self):
         self.sliceCompile(k4_nodes, self.k4topo, self.k4combined)
 
-    @unittest.skip('')
     def testHostsCompile(self):
         self.sliceCompile(k4_nodes, self.k4hosts_topo, self.k4hosts_combined)
 
@@ -229,11 +219,9 @@ class TestCompleteGraph(unittest.TestCase):
     def testExpensiveEdgeCompile(self):
         self.edgeCompile(k10_nodes, self.k10topo, self.k10combined)
 
-    @unittest.skip('')
     def testCheapEdgeCompile(self):
         self.edgeCompile(k4_nodes, self.k4topo, self.k4combined)
 
-    @unittest.skip('')
     def testHostsCompile(self):
         self.edgeCompile(k4_nodes, self.k4hosts_topo, self.k4hosts_combined)
 
@@ -301,4 +289,6 @@ class TestCompleteGraph(unittest.TestCase):
                                                  compiled[j]))
 
 if __name__ == '__main__':
+    #suite = unittest.TestLoader().loadTestsFromTestCase(TestEdgeCompile)
+    #unittest.TextTestRunner(verbosity=2).run(suite)
     unittest.main()

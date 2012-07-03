@@ -183,7 +183,7 @@ def external_policy(slic, policy, symm_vlan):
     ARGS:
         slic:  Slice to produce this policy for
         policy:  Policy to restrict
-        vlan:  {edge -> vlan}, symmetric
+        vlan:  {edge -> vlan}, symmetric on edges: (0, 1): v => (1, 0): v.
 
     RETURNS:
         A policy that moves packets incoming to external ports into the vlan,
@@ -196,7 +196,7 @@ def external_policy(slic, policy, symm_vlan):
             # Since we only care about incident external edges, if we're
             # considering an internal edge, we don't want to add any predicates.
             # In principle, there shouldn't be any of these
-            (_, (dst_switch, dst_port)) = edge_of_port(slic.l_topo, (s, p))
+            pass
         else:
             # An external edge
             ext_pred = external_predicate((s, p), pred) & VLAN0
@@ -204,14 +204,20 @@ def external_policy(slic, policy, symm_vlan):
                 if ((s, p_out), dst) in symm_vlan: # it's an internal edge
                     target_vlan = symm_vlan[((s, p_out), dst)]
                     new_policy = (policy % ext_pred).reduce()
-                # modify_vlan_local does not create any new reduceables
-                    policies.append(modify_vlan_local(new_policy, (s, p_out),
-                                                      target_vlan))
+                    # modify_vlan_local does not create any new reduceables
+                    new_policy = modify_vlan_local(new_policy, (s, p_out),
+                                                   target_vlan,
+                                                   this_port_only=True)
+                    new_policy = new_policy.reduce()
+                    if new_policy != nc.BottomPolicy():
+                        policies.append(new_policy)
                 else: # outgoing, set it to 0
-                    # but since we already know the packet is set to 0, just
-                    # append the policy
                     new_policy = (policy % ext_pred).reduce()
-                    policies.append(new_policy)
+                    new_policy = modify_vlan_local(new_policy, (s, p_out),
+                                                   0, this_port_only=True)
+                    new_policy = new_policy.reduce()
+                    if new_policy != nc.BottomPolicy():
+                        policies.append(new_policy)
     return policies
 
 def stress_test(inp=None, n=256):

@@ -143,10 +143,6 @@ def compiled_correctly(topo, orig, result):
 
     RETURNS: True or False.
     """
-    print simulates(topo, orig, result)
-    print simulates(topo, result, orig)
-    print one_per_edge(topo, result)
-
     return (simulates(topo, orig, result) and
             simulates(topo, result, orig) and
             one_per_edge(topo, result) is None)
