@@ -161,6 +161,10 @@ class Predicate:
         """Does this header match this located packet?"""
         pass
 
+    @abstractmethod
+    def size(self):
+        """Return AST size of the tree rooted at this node."""
+
     def __repr__(self):
         return self.__str__()
 
@@ -202,6 +206,9 @@ class Top(Predicate):
     def match(self, packet, (switch, port)):
         return True
 
+    def size(self):
+        return 1
+
     def reduce(self):
         return Top()
 
@@ -224,6 +231,9 @@ class Bottom(Predicate):
 
     def match(self, packet, (switch, port)):
         return False
+
+    def size(self):
+        return 1
 
     def reduce(self):
         return Bottom()
@@ -292,6 +302,9 @@ class Header(Predicate):
 
     def __eq__(self, other):
         return (isinstance(other, Header) and self.fields == other.fields)
+
+    def size(self):
+        return 1
 
     def reduce(self):
         return Header(self.fields)
@@ -373,6 +386,9 @@ class Union(Predicate):
                 ((self.left == other.left and self.right == other.right) or
                  (self.right == other.left and self.left == other.right)))
 
+    def size(self):
+        return 1 + self.left.size() + self.right.size()
+
     # TODO(astory): top-reduction over subcomponents
     def reduce(self):
         r_left = self.left.reduce()
@@ -436,6 +452,9 @@ class Intersection(Predicate):
         return (isinstance(other, Intersection) and
                 ((self.left == other.left and self.right == other.right) or
                  (self.right == other.left and self.left == other.right)))
+
+    def size(self):
+        return 1 + self.left.size() + self.right.size()
 
     def reduce(self):
         r_left = self.left.reduce()
@@ -532,7 +551,11 @@ class Difference(Predicate):
         return self.__str__()
 
     def __eq__(self, other):
-        return self.left == other.left and self.right == other.right
+        return (isinstance(other, Difference) and
+                self.left == other.left and self.right == other.right)
+
+    def size(self):
+        return 1 + self.left.size() + self.right.size()
 
     def reduce(self):
         r_left = self.left.reduce()
@@ -714,6 +737,10 @@ class Policy:
         return not self == other
 
     @abstractmethod
+    def size(self):
+        pass
+
+    @abstractmethod
     def get_actions(self, packet, loc):
         """Get set of actions this policy generates for a located packet."""
         pass
@@ -758,6 +785,9 @@ class BottomPolicy(Policy):
     def __eq__(self, other):
         return isinstance(other, BottomPolicy)
 
+    def size(self):
+        return 1
+
 def make_policy(predicate, action):
     """Construct a policy with one or more actions.
 
@@ -794,6 +824,10 @@ class PrimitivePolicy(Policy):
         return isinstance(other, PrimitivePolicy) and \
             self.predicate == other.predicate and \
             self.actions == other.actions
+
+    # TODO(astory): do actions have a size?
+    def size(self):
+        return self.predicate.size() + 1
 
     def reduce(self):
         if len(self.actions) == 0:
@@ -861,6 +895,9 @@ class PolicyUnion(Policy):
         return (isinstance(other, PolicyUnion) and
                 ((self.left == other.left and self.right == other.right) or
                  (self.right == other.left and self.left == other.right)))
+
+    def size(self):
+        return 1 + self.left.size() + self.right.size()
 
     def reduce(self):
         r_left = self.left.reduce()
@@ -937,6 +974,9 @@ class PolicyRestriction(Policy):
     def __eq__(self, other):
         return (isinstance(other, PolicyRestriction) and
                 self.policy == other.policy and self.predicate == other.predicate)
+
+    def size(self):
+        return 1 + self.policy.size() + self.predicate.size()
 
     def reduce(self):
         r_pred = self.predicate.reduce()
