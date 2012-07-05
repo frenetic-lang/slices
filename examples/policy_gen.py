@@ -113,3 +113,26 @@ def all_pairs_shortest_path(topo, hosts_only=False):
         forwarding_trees.append(nary_policy_union(policies)
                                 % Header({'dstmac': source}))
     return nary_policy_union(forwarding_trees)
+
+def multicast(topo, multicast_field='dstmac', multicast_value=0):
+    """Construct a policy that multicasts packets to all nodes along the MST.
+
+    Uses multicast_field:multicast_value to recognize multicast packets to send
+    along the minimum spanning tree.
+    """
+    mst = nx.minimum_spanning_tree(topo)
+    edges = set(mst.edges())
+    for (n1, n2) in list(edges):
+        edges.add((n2, n1))
+    policies = []
+    for node in topo.switches():
+        ports = set()
+        for switch, port in topo.node[node]['ports'].items():
+            # If this link is in the MST
+            if (node, switch) in edges:
+                ports.add(port)
+        for port in ports:
+            others = ports.difference([port])
+            policies.append(inport(node, port) |then| Action(node, others))
+    return (nary_policy_union(policies)
+            % Header({multicast_field: multicast_value}))
