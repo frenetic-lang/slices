@@ -46,6 +46,12 @@ of networkX's diverse set of graph generators.
 from nxtopo import NXTopo
 from nxtopo import from_graph
 
+# These functions use Mark's generators, which may not be importable if they
+# don't have access to his code, so import inside the functions.
+def waxman(n, alpha=0.8, beta=0.1):
+    import waxman_topo
+    return nxtopo.from_graph(waxman_topo.waxman_graph(n, alpha, beta))
+
 def make_id(label, *indexes, **kwargs):
     """Generate an id beginning with label and following with indexes.
 
