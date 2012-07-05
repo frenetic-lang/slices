@@ -123,3 +123,19 @@ def fields_of_policy(pol):
     elif isinstance(pol, nc.PolicyRestriction):
         return fields_of_policy(pol.policy).union(
                fields_of_predicate(pol.predicate))
+
+def observations(policy):
+    """Return set of observations policy may emit."""
+    if isinstance(policy, nc.BottomPolicy):
+        return set()
+    elif isinstance(policy, nc.PrimitivePolicy):
+        obs = set()
+        for a in policy.actions:
+            obs.update(a.obs)
+        return obs
+    elif isinstance(policy, nc.PolicyUnion):
+        left = observations(policy.left)
+        left.update(observations(policy.right))
+        return left
+    elif isinstance(policy, nc.PolicyRestriction):
+        return observations(policy.policy)

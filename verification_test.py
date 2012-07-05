@@ -34,12 +34,13 @@ from examples import topology_gen, policy_gen
 import edge_compile as ec
 import networkx as nx
 import netcore as nc
+from netcore import then
 import unittest
 import verification
 
 from test_util import linear, linear_all_ports, k10_nodes, k10, k4_nodes, k4
 
-class ValidationTest(unittest.TestCase):
+class VerificationTest(unittest.TestCase):
     def setUp(self):
         self.k10topo, self.k10combined = k10()
         self.k10policies = [p for _, p in self.k10combined]
@@ -70,6 +71,17 @@ class ValidationTest(unittest.TestCase):
                     self.assertTrue(result)
                 else:
                     self.assertFalse(result)
+
+class ObservationTest(unittest.TestCase):
+    def testOverlap(self):
+        p1 = nc.Top() |then| nc.Action(0, obs=[1, 2, 3])
+        p2 = nc.Top() |then| nc.Action(0, obs=[3, 4, 5])
+        self.assertFalse(verification.disjoint_observations(p1, p2))
+
+    def testDisjoint(self):
+        p1 = nc.Top() |then| nc.Action(0, obs=[1, 2, 3])
+        p2 = nc.Top() |then| nc.Action(0, obs=[4, 5, 6])
+        self.assertTrue(verification.disjoint_observations(p1, p2))
 
 if __name__ == '__main__':
     unittest.main()

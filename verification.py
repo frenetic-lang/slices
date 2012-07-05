@@ -53,3 +53,9 @@ def slice_node_iso(slice1, slice2):
     switches2 = set([s for (s, _) in ports_mapped2])
 
     return len(switches1.intersection(switches2)) > 0
+
+def disjoint_observations(policy1, policy2):
+    obs1 = util.observations(policy1)
+    obs2 = util.observations(policy2)
+    intersection = obs1.intersection(obs2)
+    return len(intersection) == 0
