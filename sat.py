@@ -36,7 +36,7 @@ No observations yet.
 """
 
 from z3.z3 import And, Or, Not, Implies, Function, ForAll
-from z3.z3 import Const, Consts, Solver, unsat, set_option, Ints
+from z3.z3 import Const, Consts, Solver, unsat, set_option, Int, Ints
 from netcore import HEADERS
 import netcore as nc
 
@@ -47,6 +47,8 @@ set_option(pull_nested_quantifiers=True)
 from sat_core import nary_or, nary_and
 from sat_core import HEADER_INDEX, Packet, switch, port, vlan
 from sat_core import forwards, forwards_with, observes, observes_with
+from sat_core import input, output, ingress, egress
+from verification import disjoint_observations
 
 def transfer(topo, p_out, p_in):
     """Build constraint for moving p_out to p_in across an edge."""
@@ -257,62 +259,71 @@ def one_per_edge(topo, pol, field='vlan'):
     else:
         return solv.model(), (p, pp), HEADER_INDEX
 
-def isolated(topo, policy1, policy2):
-    """Determine if policy1 is isolated from policy2.
+def separate(topo, policy1, policy2):
+    return (shared_io(topo, policy1, policy2) is None) and\
+           (shared_io(topo, policy2, policy1) is None) and\
+           (shared_inputs(policy1, policy2) is None) and\
+           (shared_inputs(policy2, policy1) is None) and\
+           (shared_outputs(policy1, policy2) is None) and\
+           (shared_outputs(policy2, policy1) is None)
 
-    RETURNS: True or False
-    """
-    return isolated_model(topo, policy1, policy2) is None
+def unshared_portals(topo, policy1, policy2):
+    return (disjoint_observations(policy1, policy2) and
+            shared_transit(policy1, policy2) is None)
 
-def isolated_diagnostic(topo, policy1, policy2):
-    """Determine if policy1 is isolated from policy2.
+def shared_io(topo, policy1, policy2):
+    """Try to find output of policy1 in the inputs of policy2."""
+    p, pp, q, qq = Consts('p pp q qq', Packet)
+    o = Int('o')
 
-    RETURNS: The empty string if they are isolated, or a diagnostic string
-        detailing what packets will break isolation if they are not.
-    """
+    solv = Solver()
+    solv.add(output(policy1, p, pp))
+    solv.add(transfer(topo, pp, q))
+    solv.add(input(policy2, q, qq, o))
 
-    solution = isolated_model(topo, policy1, policy2)
-    if solution is None:
-        return ''
-    else:
-        (model, (p1, p2, p3, p4), hs) = solution
-        properties = {}
-        for p in (p1, p2, p3, p4):
-            properties[str(p)] = explain(model, p, hs)
-    return ('%s\n'
-            '---policy1--->\n'
-            '%s\n'
-            '---topology-->\n'
-            '%s\n'
-            '---policy2--->\n'
-            '%s'
-            % (properties[str(p1)], properties[str(p2)],
-               properties[str(p3)], properties[str(p4)]))
-
-def isolated_model(topo, policy1, policy2):
-    """Determine if policy1 can produce a packet that goes to policy2.
-
-    RETURNS: None if the policies are isolated
-             (model, (pkt1, pkt2, pkt3, pkt4), HEADER_INDEX) if they are not
-
-    The idea here is that if
-
-    \exists pkt1, pkt2, pkt3, pkt4 . P1(pkt1, pkt2) and
-                                     transfer(pkt2, pkt3) and
-                                     P2(pkt3, pkt4)
-
-    is inhabited, then they're not isolated.
-
-    If you want to get back the problematic packets, evaluate the HEADER_INDEX
-    functions in the model on the packets.
-    """
-    pkt1, pkt2, pkt3, pkt4 = Consts('pkt1 pkt2 pkt3 pkt4', Packet)
-    s = Solver()
-    s.add(forwards(policy1, pkt1, pkt2))
-    s.add(transfer(topo, pkt2, pkt3))
-    s.add(forwards(policy2, pkt3, pkt4))
-
-    if s.check() == unsat:
+    if solv.check() == unsat:
         return None
     else:
-        return (s.model(), (pkt1, pkt2, pkt3, pkt4), HEADER_INDEX)
+        return solv.model(), (p, pp, q, qq), HEADER_INDEX
+
+def shared_inputs(policy1, policy2):
+    """Try to find packet in input of policy1 and ingress of policy2."""
+    p, pp, qq = Consts('p pp qq', Packet)
+    o, n = Ints('o n')
+
+    solv = Solver()
+    solv.add(input(policy1, p, pp, o))
+    solv.add(ingress(policy2, p, qq, n))
+
+    if solv.check() == unsat:
+        return None
+    else:
+        return solv.model(), (p, pp, qq), HEADER_INDEX
+
+def shared_outputs(policy1, policy2):
+    """Try to find packet in output of policy1 and egress of slice2."""
+    p, q, pp = Consts('p q pp', Packet)
+
+    solv = Solver()
+    solv.add(output(policy1, p, pp))
+    solv.add(egress(policy2, q, pp))
+
+    if solv.check() == unsat:
+        return None
+    else:
+        return solv.model(), (p, pp), HEADER_INDEX
+
+# TODO(astory): think harder about
+def shared_transit(topo, policy1, policy2):
+    """Try to find packet in the border of policy1 and the border of policy2."""
+    p, pp, qq = Const('p pp qq', Packet)
+    o, n = Ints('o n')
+
+    solv = Solver()
+    solv.add(Or(ingress(policy1, p, pp, o), egress(policy1, p, pp, o)))
+    solv.add(Or(ingress(policy2, p, qq, n), egress(policy2, p, qq, n)))
+
+    if solv.check() == unsat:
+        return None
+    else:
+        return solv.model(), (p,), HEADER_INDEX

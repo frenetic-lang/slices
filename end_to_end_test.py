@@ -66,13 +66,13 @@ verbose = 'VERBOSE_TESTS' in os.environ
 class TestVerify(unittest.TestCase):
     def testBasicOverlap(self):
         topo, policies = linear((0, 1, 2), (1, 2, 3))
-        self.assertFalse(sat.isolated(topo, policies[0], policies[1]))
+        self.assertIsNotNone(sat.shared_io(topo, policies[0], policies[1]))
 
     def testBasicIso(self):
         topo, policies = linear((0, 1), (2, 3))
-        self.assertTrue(sat.isolated(topo, policies[0], policies[1]))
+        self.assertIsNone(sat.shared_io(topo, policies[0], policies[1]))
         topo, policies = linear((0, 1, 2), (2, 3))
-        self.assertTrue(sat.isolated(topo, policies[0], policies[1]))
+        self.assertIsNone(sat.shared_io(topo, policies[0], policies[1]))
 
     def testForwarding(self):
         topo, policies = linear((0, 1), (2, 3))
@@ -91,8 +91,8 @@ class TestCompile(unittest.TestCase):
         slices = [slicing.ident_map_slice(topo, {}) for p in policies]
         combined = zip(slices, policies)
         compiled = cp.compile_slices(combined)
-        self.assertFalse(sat.isolated(topo, policies[0], policies[1]))
-        self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
+        self.assertIsNotNone(sat.shared_io(topo, policies[0], policies[1]))
+        self.assertIsNone(sat.shared_io(topo, compiled[0], compiled[1]))
 
         self.assertTrue(sat.compiled_correctly(topo, policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(topo, policies[1], compiled[1]))
@@ -101,8 +101,8 @@ class TestCompile(unittest.TestCase):
         topo, combined = linear_hosts((0, 1, 2, 3), (0, 1, 2, 3))
         policies = [p for _, p in combined]
         compiled = cp.compile_slices(combined)
-        self.assertFalse(sat.isolated(topo, policies[0], policies[1]))
-        self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
+        self.assertIsNotNone(sat.shared_io(topo, policies[0], policies[1]))
+        self.assertIsNone(sat.shared_io(topo, compiled[0], compiled[1]))
 
         self.assertTrue(sat.compiled_correctly(topo, policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(topo, policies[1], compiled[1]))
@@ -113,8 +113,8 @@ class TestEdgeCompile(unittest.TestCase):
         slices = [slicing.ident_map_slice(topo, {}) for p in policies]
         combined = zip(slices, policies)
         compiled = ec.compile_slices(topo, combined)
-        self.assertFalse(sat.isolated(topo, policies[0], policies[1]))
-        self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
+        self.assertIsNotNone(sat.shared_io(topo, policies[0], policies[1]))
+        self.assertIsNone(sat.shared_io(topo, compiled[0], compiled[1]))
         self.assertTrue(sat.compiled_correctly(topo, policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(topo, policies[1], compiled[1]))
 
@@ -122,8 +122,8 @@ class TestEdgeCompile(unittest.TestCase):
         slices = [slicing.ident_map_slice(topo, {}) for p in policies]
         combined = zip(slices, policies)
         compiled = ec.compile_slices(topo, combined)
-        self.assertTrue(sat.isolated(topo, policies[0], policies[1]))
-        self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
+        self.assertIsNone(sat.shared_io(topo, policies[0], policies[1]))
+        self.assertIsNone(sat.shared_io(topo, compiled[0], compiled[1]))
         self.assertTrue(sat.compiled_correctly(topo, policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(topo, policies[1], compiled[1]))
 
@@ -131,8 +131,8 @@ class TestEdgeCompile(unittest.TestCase):
         slices = [slicing.ident_map_slice(topo, {}) for p in policies]
         combined = zip(slices, policies)
         compiled = ec.compile_slices(topo, combined)
-        self.assertFalse(sat.isolated(topo, policies[0], policies[1]))
-        self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
+        self.assertIsNotNone(sat.shared_io(topo, policies[0], policies[1]))
+        self.assertIsNone(sat.shared_io(topo, compiled[0], compiled[1]))
         self.assertTrue(sat.compiled_correctly(topo, policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(topo, policies[1], compiled[1]))
 
@@ -140,8 +140,8 @@ class TestEdgeCompile(unittest.TestCase):
         slices = [slicing.ident_map_slice(topo, {}) for p in policies]
         combined = zip(slices, policies)
         compiled = ec.compile_slices(topo, combined)
-        self.assertTrue(sat.isolated(topo, policies[0], policies[1]))
-        self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
+        self.assertIsNone(sat.shared_io(topo, policies[0], policies[1]))
+        self.assertIsNone(sat.shared_io(topo, compiled[0], compiled[1]))
         self.assertTrue(sat.compiled_correctly(topo, policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(topo, policies[1], compiled[1]))
 
@@ -149,8 +149,8 @@ class TestEdgeCompile(unittest.TestCase):
         slices = [slicing.ident_map_slice(topo, {}) for p in policies]
         combined = zip(slices, policies)
         compiled = ec.compile_slices(topo, combined)
-        self.assertTrue(sat.isolated(topo, policies[0], policies[1]))
-        self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
+        self.assertIsNone(sat.shared_io(topo, policies[0], policies[1]))
+        self.assertIsNone(sat.shared_io(topo, compiled[0], compiled[1]))
         self.assertTrue(sat.compiled_correctly(topo, policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(topo, policies[1], compiled[1]))
 
@@ -169,10 +169,71 @@ class TestEdgeCompile(unittest.TestCase):
         topo, combined = linear_hosts((0, 1, 2, 3), (0, 1, 2, 3))
         policies = [p for _, p in combined]
         compiled = ec.compile_slices(topo, combined)
-        self.assertFalse(sat.isolated(topo, policies[0], policies[1]))
-        self.assertTrue(sat.isolated(topo, compiled[0], compiled[1]))
+        self.assertIsNotNone(sat.shared_io(topo, policies[0], policies[1]))
+        self.assertIsNone(sat.shared_io(topo, compiled[0], compiled[1]))
         self.assertTrue(sat.compiled_correctly(topo, policies[0], compiled[0]))
         self.assertTrue(sat.compiled_correctly(topo, policies[1], compiled[1]))
+
+class TestSeparation(unittest.TestCase):
+    def testInputDisjoint(self):
+        p1 = nc.Header({'switch': 0, 'port': 1, 'vlan': 0}) |then|\
+             nc.Action(0, [2])
+        p2 = nc.Header({'switch': 0, 'port': 2, 'vlan': 0}) |then|\
+             nc.Action(0, [3])
+        self.assertIsNone(sat.shared_inputs(p1, p2))
+
+    def testInputOverlap(self):
+        p1 = nc.Header({'switch': 0, 'port': 1, 'vlan': 0}) |then|\
+             nc.Action(0, [2])
+        p2 = nc.Header({'switch': 0, 'port': 1, 'vlan': 0}) |then|\
+             nc.Action(0, [3])
+        self.assertIsNotNone(sat.shared_inputs(p1, p2))
+
+    def testOutputDisjoint(self):
+        p1 = nc.inport(0, 1) |then| nc.Action(0, [2], {'vlan': 0, 'srcmac': 1})
+        p2 = nc.inport(0, 1) |then| nc.Action(0, [2], {'vlan': 0, 'srcmac': 2})
+        self.assertIsNone(sat.shared_outputs(p1, p2))
+
+    def testOutputOverlap(self):
+        p1 = nc.inport(0, 1) |then| nc.Action(0, [2], {'vlan': 0, 'srcmac': 1})
+        p2 = nc.inport(0, 1) |then| nc.Action(0, [2], {'vlan': 0, 'srcmac': 1})
+        self.assertIsNotNone(sat.shared_outputs(p1, p2))
+
+    def testBasic(self):
+        topo, policies = linear((0, 1, 2, 3), (0, 1, 2, 3))
+        slices = [slicing.ident_map_slice(topo, {}) for p in policies]
+        combined = zip(slices, policies)
+        compiled = cp.compile_slices(combined)
+        self.assertTrue(sat.separate(topo, compiled[0], compiled[1]))
+
+    def testBasicFail(self):
+        topo, combined = linear_hosts((0, 1, 2, 3), (0, 1, 2, 3))
+        policies = [p for _, p in combined]
+        compiled = ec.compile_slices(topo, combined)
+        self.assertIsNone(sat.shared_io(topo, compiled[0], compiled[1]))
+        self.assertIsNone(sat.shared_io(topo, compiled[1], compiled[0]))
+        self.assertIsNotNone(sat.shared_inputs(compiled[0], compiled[1]))
+        self.assertIsNotNone(sat.shared_inputs(compiled[1], compiled[0]))
+        self.assertIsNotNone(sat.shared_outputs(compiled[0], compiled[1]))
+        self.assertIsNotNone(sat.shared_outputs(compiled[1], compiled[0]))
+        self.assertFalse(sat.separate(topo, compiled[0], compiled[1]))
+
+    def testEdgePredicates(self):
+        topo, combined = linear_hosts((0, 1, 2, 3), (0, 1, 2, 3))
+        for key in combined[0][0].edge_policy:
+            combined[0][0].edge_policy[key] = nc.Header({'srcmac': 100})
+        for key in combined[1][0].edge_policy:
+            combined[1][0].edge_policy[key] = nc.Header({'srcmac': 101})
+        policies = [p for _, p in combined]
+        compiled = ec.compile_slices(topo, combined)
+        self.assertIsNone(sat.shared_io(topo, compiled[0], compiled[1]))
+        self.assertIsNone(sat.shared_io(topo, compiled[1], compiled[0]))
+        self.assertIsNone(sat.shared_inputs(compiled[0], compiled[1]))
+        self.assertIsNone(sat.shared_inputs(compiled[1], compiled[0]))
+        # If we had outbound predicates, these would be None
+        self.assertIsNotNone(sat.shared_outputs(compiled[0], compiled[1]))
+        self.assertIsNotNone(sat.shared_outputs(compiled[1], compiled[0]))
+        self.assertFalse(sat.separate(topo, compiled[0], compiled[1]))
 
 class TestCompleteGraph(unittest.TestCase):
     def setUp(self):
@@ -246,11 +307,11 @@ class TestCompleteGraph(unittest.TestCase):
                     print "testing %s with %s." % (nodes[i], nodes[j])
                     print str(policies[i])
                     print str(policies[j])
-                result = sat.isolated(topo, policies[i], policies[j])
+                result = sat.shared_io(topo, policies[i], policies[j])
                 if len(set(nodes[i]).intersection(nodes[j])) > 1:
-                    self.assertFalse(result)
+                    self.assertIsNotNone(result)
                 else:
-                    self.assertTrue(result)
+                    self.assertIsNone(result)
 
     def sliceCompile(self, nodes, topo, combined):
         compiled = cp.compile_slices(combined)
@@ -262,13 +323,13 @@ class TestCompleteGraph(unittest.TestCase):
                 if verbose:
                     print "testing compiled %s with %s."\
                           % (nodes[i], nodes[j])
-                result = sat.isolated(topo, compiled[i], compiled[j])
+                result = sat.shared_io(topo, compiled[i], compiled[j])
                 if i == j:
-                    self.assertFalse(result)
+                    self.assertIsNotNone(result)
                 else:
                     cc = sat.compiled_correctly(topo, combined[i][1], compiled[j])
                     self.assertIsNotNone(cc)
-                    self.assertTrue(result)
+                    self.assertIsNone(result)
 
     def edgeCompile(self, nodes, topo, combined):
         compiled = ec.compile_slices(topo, combined, verbose=verbose)
@@ -276,7 +337,7 @@ class TestCompleteGraph(unittest.TestCase):
         for i in range(len(compiled)):
             self.assertTrue(sat.compiled_correctly(topo, combined[i][1],
                                                          compiled[i]))
-            self.assertFalse(sat.isolated(topo, compiled[i], compiled[i]))
+            self.assertIsNotNone(sat.shared_io(topo, compiled[i], compiled[i]))
             for j in range(len(compiled)):
                 if verbose:
                     print "testing edge compiled %d:%s with %d:%s."\
@@ -285,10 +346,10 @@ class TestCompleteGraph(unittest.TestCase):
                     self.assertFalse(sat.compiled_correctly(topo, combined[i][1],
                                                                   compiled[j]))
 
-                    self.assertTrue(sat.isolated(topo, compiled[i],
+                    self.assertIsNone(sat.shared_io(topo, compiled[i],
                                                  compiled[j]))
 
 if __name__ == '__main__':
-    #suite = unittest.TestLoader().loadTestsFromTestCase(TestEdgeCompile)
-    #unittest.TextTestRunner(verbosity=2).run(suite)
-    unittest.main()
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestSeparation)
+    unittest.TextTestRunner(verbosity=2).run(suite)
+    #unittest.main()

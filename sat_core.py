@@ -68,6 +68,10 @@ def equiv_modulo(fields, p1, p2):
 
     return nary_and(constraints)
 
+def match(pred, pkt):
+    """Build the constraint for pred matching pkt."""
+    return match_with(pred, pkt, {})
+
 def match_with(pred, pkt, mods):
     """Build the constraint for pred matching pkt."""
     if isinstance(pred, nc.Top):
@@ -236,3 +240,34 @@ def observes_with(policy, packet, mods, obs):
                    match_with(pred, packet, mods))
     else:
         raise Exception('unknown policy type: %s' % policy.__class__)
+
+def input(policy, packet, output, obs):
+    """Build constriant for packet being in the input of policy."""
+    fwrd = forwards(policy, packet, output)
+    obsv = observes(policy, packet, obs)
+    # Work around z3 limitation where you can't Or(False, False).
+    # NOTE: z3 overloads the equality operator, but is is safe for True/False.
+    if (fwrd is False) and (obsv is False):
+        return False
+    else:
+        return Or(fwrd, obsv)
+
+def output(policy, in_packet, packet):
+    """Build constraint for packet being in the output of policy."""
+    return forwards(policy, in_packet, packet)
+
+def ingress(policy, packet, output, obs):
+    """Build constriant for a packet being in the ingress set of the policy.
+
+    Note that this differs from the paper definition in that it's not one hop
+    across the topology.
+    """
+    return And(vlan(packet) == 0, input(policy, packet, output, obs))
+
+def egress(policy, in_packet, packet):
+    """Build constriant for a packet being in the egress set of the policy.
+
+    Note that this differs from the paper definition in that it's not one hop
+    across the topology.
+    """
+    return And(vlan(packet) == 0, output(policy, in_packet, packet))
