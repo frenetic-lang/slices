@@ -103,7 +103,7 @@ def all_pairs_shortest_path(topo, hosts_only=False):
         next_hops = {}
         for dest, path in paths.items():
             # path is a list, starting at source and ending at dest.
-            if dest is not source and dest['isSwitch']:
+            if dest is not source and topo.node[dest]['isSwitch']:
                 next_hops[dest] = path[-2]
         policies = []
         for node, next_node in next_hops.items():
