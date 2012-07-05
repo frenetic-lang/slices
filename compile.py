@@ -142,7 +142,10 @@ def external_predicate((switch, port), predicate):
 
 def modify_vlan(policy, vlan):
     """Re-write all actions of policy to set vlan to vlan."""
-    if isinstance(policy, nc.PrimitivePolicy):
+    if isinstance(policy, nc.BottomPolicy):
+        # Bottom policy, contains no actions
+        return policy
+    elif isinstance(policy, nc.PrimitivePolicy):
         policy = copy.deepcopy(policy)
         for action in policy.actions:
             action.modify['vlan'] = vlan
