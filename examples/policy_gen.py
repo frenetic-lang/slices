@@ -30,7 +30,9 @@
 ################################################################################
 """Tools to generate policies"""
 
-from netcore import forward, inport, nary_policy_union, then, Top, Action
+from netcore import nary_policy_union, then
+from netcore import Header, forward, inport, Top, Action
+import networkx as nx
 
 def flood(topo, all_ports=False):
     """Construct a policy that floods packets out each port on each switch.
@@ -81,3 +83,33 @@ def flood_observe(topo, label=None, all_ports=False):
                       Action(switch, ports=[other_port], obs=[label])
                 policies.append(pol)
     return nary_policy_union(policies).reduce()
+
+def all_pairs_shortest_path(topo, hosts_only=False):
+    """Construct all-pairs-shortest-path routing policy.
+
+    Constructs an all-pairs shortest path routing policy for topo, using each
+    switch or host id number as the source and destination mac address.
+
+    Only make paths to hosts if hosts_only
+
+    RETURNS: a policy that implements all-pairs shortest path
+    """
+    forwarding_trees = []
+    for source in (topo.hosts() if hosts_only else topo.nodes()):
+        # For each node, build the shortest paths to that node
+        # We 'start' at the node because networkx forces us to.
+        paths = nx.shortest_path(topo, source=source)
+        # Build next-hop table
+        next_hops = {}
+        for dest, path in paths.items():
+            # path is a list, starting at source and ending at dest.
+            if dest is not source and dest['isSwitch']:
+                next_hops[dest] = path[-2]
+        policies = []
+        for node, next_node in next_hops.items():
+            out_port = topo.node[node]['ports'][next_node]
+            policies.append(Header({'switch': node})
+                            |then| forward(node, out_port))
+        forwarding_trees.append(nary_policy_union(policies)
+                                % Header({'dstmac': source}))
+    return nary_policy_union(forwarding_trees)
