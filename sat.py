@@ -48,6 +48,7 @@ from sat_core import nary_or, nary_and
 from sat_core import HEADER_INDEX, Packet, switch, port, vlan
 from sat_core import forwards, forwards_with, observes, observes_with
 from sat_core import input, output, ingress, egress
+from sat_core import external_link, edges_ingress
 from verification import disjoint_observations
 
 def transfer(topo, p_out, p_in):
@@ -135,7 +136,7 @@ def not_empty(policy):
     else:
         return (s.model(), (p_in, p_out), HEADER_INDEX)
 
-def compiled_correctly(topo, orig, result):
+def compiled_correctly(topo, orig, result, edge_policy={}):
     """Determine if result is a valid compilation of orig.
 
     Preconditions:
@@ -145,11 +146,11 @@ def compiled_correctly(topo, orig, result):
 
     RETURNS: True or False.
     """
-    return (simulates(topo, orig, result) and
+    return (simulates(topo, orig, result, edge_policy=edge_policy) and
             simulates(topo, result, orig) and
             one_per_edge(topo, result) is None)
 
-def simulates(topo, a, b, field='vlan'):
+def simulates(topo, a, b, field='vlan', edge_policy={}):
     """Determine if b simulates a up to field.
     
     This ensures all the observations, 1-hop and 2-hop paths are equivalent.  It
@@ -158,11 +159,14 @@ def simulates(topo, a, b, field='vlan'):
     source, not the compilation target, so you need to check one_per_edge after
     calling this to ensure compilation correctness.
     """
-    return (simulates_forwards(a, b, field=field) is None and
-            simulates_observes(a, b, field=field) is None and
-            simulates_forwards2(topo, a, b, field=field) is None)
+    return (simulates_forwards(a, b, field=field, edge_policy=edge_policy)
+                is None and
+            simulates_observes(a, b, field=field, edge_policy=edge_policy)
+                is None and
+            simulates_forwards2(topo, a, b, field=field, edge_policy=edge_policy)
+                is None)
 
-def simulates_forwards(a, b, field='vlan'):
+def simulates_forwards(a, b, field='vlan', edge_policy={}):
     """Determine if b simulates a up to field on one hop."""
     p, pp = Consts('p pp', Packet)
     v, vv = Ints('v vv')
@@ -172,9 +176,15 @@ def simulates_forwards(a, b, field='vlan'):
 
     solv = Solver()
 
+    # b doesn't need to forward packets on external links that don't satisfy the
+    # ingress predicate
+    edge_option = And(external_link(edge_policy, p),
+                      Not(edges_ingress(edge_policy, p)))
+
     solv.add(And(forwards(a, p, pp),
-             ForAll([v, vv], Not(forwards_with(b, p, {field: v},
-                                                  pp, {field: vv})),
+             ForAll([v, vv], Not(Or(forwards_with(b, p, {field: v},
+                                                     pp, {field: vv}),
+                                    edge_option)),
                     patterns=[])))
     if solv.check() == unsat:
         set_option('WARNING', True)
@@ -183,7 +193,7 @@ def simulates_forwards(a, b, field='vlan'):
         set_option('WARNING', True)
         return solv.model(), (p, pp), HEADER_INDEX
 
-def simulates_observes(a, b, field='vlan'):
+def simulates_observes(a, b, field='vlan', edge_policy={}):
     p = Const('p', Packet)
     o, v = Ints('o v')
     # Z3 emits a warning about not finding a pattern for our quantification.
@@ -192,8 +202,14 @@ def simulates_observes(a, b, field='vlan'):
 
     solv = Solver()
 
+    # b doesn't need to observe packets on external links that don't satisfy the
+    # ingress predicate
+    edge_option = And(external_link(edge_policy, p),
+                      Not(edges_ingress(edge_policy, p)))
+
     solv.add(And(observes(a, p, o),
-             ForAll([v], Not(observes_with(b, p, {field: v}, o)),
+             ForAll([v], Not(Or(observes_with(b, p, {field: v}, o),
+                                edge_option)),
                     patterns=[])))
 
     #import IPython.Shell; IPython.Shell.IPShellEmbed(argv=[])()
@@ -205,7 +221,7 @@ def simulates_observes(a, b, field='vlan'):
         set_option('WARNING', True)
         return solv.model(), (p), HEADER_INDEX
 
-def simulates_forwards2(topo, a, b, field='vlan'):
+def simulates_forwards2(topo, a, b, field='vlan', edge_policy={}):
     """Determine if b simulates a up to field on two hop on topo."""
     p, pp, q, qq = Consts('p pp q qq', Packet)
     v, vv, vvv = Ints('v vv, vvv')
@@ -215,6 +231,11 @@ def simulates_forwards2(topo, a, b, field='vlan'):
 
     solv = Solver()
 
+    # b doesn't need to forward packets on external links that don't satisfy the
+    # ingress predicate, but we only care about the first hop
+    edge_option = And(external_link(edge_policy, p),
+                      Not(edges_ingress(edge_policy, p)))
+
     # This case breaks the And inside the ForAll because they're both False and
     # z3 can't handle that.  
     # However, it does mean that they simulate each other, because neither
@@ -223,8 +244,10 @@ def simulates_forwards2(topo, a, b, field='vlan'):
         return None
     c = And(forwards(a, p, pp), transfer(topo, pp, q), forwards(a, q, qq),
             ForAll([v, vv, vvv],
-                   Not(And(forwards_with(b, p, {field: v}, pp, {field: vv}),
-                           forwards_with(b, q, {field: vv}, qq, {field: vvv}))))
+                   Not(Or(And(forwards_with(b, p, {field: v}, pp, {field: vv}),
+                              forwards_with(b, q, {field: vv}, qq, {field: vvv})),
+                          edge_option)))
+
            )
 
     solv.add(c)
@@ -269,7 +292,7 @@ def separate(topo, policy1, policy2):
 
 def unshared_portals(topo, policy1, policy2):
     return (disjoint_observations(policy1, policy2) and
-            shared_transit(policy1, policy2) is None)
+            shared_transit(topo, policy1, policy2) is None)
 
 def shared_io(topo, policy1, policy2):
     """Try to find output of policy1 in the inputs of policy2."""
@@ -313,15 +336,25 @@ def shared_outputs(policy1, policy2):
     else:
         return solv.model(), (p, pp), HEADER_INDEX
 
-# TODO(astory): think harder about
+# TODO(astory): test!
 def shared_transit(topo, policy1, policy2):
-    """Try to find packet in the border of policy1 and the border of policy2."""
-    p, pp, qq = Const('p pp qq', Packet)
+    """Try to find packet in the border of policy1 and the border of policy2.
+    
+    Note that this is symmetric.
+    """
+    p, pp, ppp, qq, qqq = Consts('p pp ppp qq qqq', Packet)
     o, n = Ints('o n')
 
     solv = Solver()
-    solv.add(Or(ingress(policy1, p, pp, o), egress(policy1, p, pp, o)))
-    solv.add(Or(ingress(policy2, p, qq, n), egress(policy2, p, qq, n)))
+    # Predicates are focused on a packet p, all other packets are fodder for
+    # that one.  We want an input packet p or an output packet after a hop p in
+    # each case.
+    solv.add(Or(ingress(policy1, p, pp, o),
+                And(egress(policy1, pp, ppp),
+                    transfer(topo, ppp, p))))
+    solv.add(Or(ingress(policy2, p, qq, n),
+                And(egress(policy2, qq, qqq),
+                    transfer(topo, qqq, p))))
 
     if solv.check() == unsat:
         return None

@@ -241,6 +241,25 @@ def observes_with(policy, packet, mods, obs):
     else:
         raise Exception('unknown policy type: %s' % policy.__class__)
 
+def external_link(edge_policy, packet):
+    """Build predicate for being on an external link."""
+    constraints = []
+    for ((s, p), predicate) in edge_policy.items():
+        constraints.append(And(switch(packet) == s, port(packet) == p))
+    return nary_or(constraints)
+
+def edges_ingress(edge_policy, packet, mods={}):
+    """Build predicate for packet being in the ingress set as defined.
+    
+    Mods don't work on switch and port yet.
+    """
+    constraints = []
+    for ((s, p), predicate) in edge_policy.items():
+        constraints.append(And(switch(packet) == s,
+                               port(packet) == p,
+                               match_with(predicate, packet, mods)))
+    return nary_or(constraints)
+
 def input(policy, packet, output, obs):
     """Build constriant for packet being in the input of policy."""
     fwrd = forwards(policy, packet, output)
