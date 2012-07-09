@@ -81,14 +81,14 @@ def ports_of_topo(topo, end_hosts=False):
                 output.add((number, p_num))
     return output
 
-def build_external_predicate(l_topo):
-    """Build external predicates for topo that accept all packets."""
+def build_external_predicate(l_topo, predicate=nc.Top()):
+    """Build external predicates for topo that are predicate on all edges."""
     predicates = {}
     for n, node in l_topo.node.items():
         if node['isSwitch']:
             for p, (target, target_port) in node['port'].items():
                 if target_port == 0: # that means target is an end host
-                    predicates[(n, p)] = nc.Top()
+                    predicates[(n, p)] = predicate
     return predicates
 
 def fields_of_predicate(pred):
