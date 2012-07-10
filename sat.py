@@ -48,7 +48,7 @@ from sat_core import nary_or, nary_and
 from sat_core import HEADER_INDEX, Packet, switch, port, vlan
 from sat_core import forwards, forwards_with, observes, observes_with
 from sat_core import input, output, ingress, egress
-from sat_core import external_link, edges_ingress
+from sat_core import external_link, edges_ingress, on_valid_port
 from verification import disjoint_observations
 
 def transfer(topo, p_out, p_in):
@@ -159,14 +159,14 @@ def simulates(topo, a, b, field='vlan', edge_policy={}):
     source, not the compilation target, so you need to check one_per_edge after
     calling this to ensure compilation correctness.
     """
-    return (simulates_forwards(a, b, field=field, edge_policy=edge_policy)
+    return (simulates_forwards(topo, a, b, field=field, edge_policy=edge_policy)
                 is None and
-            simulates_observes(a, b, field=field, edge_policy=edge_policy)
+            simulates_observes(topo, a, b, field=field, edge_policy=edge_policy)
                 is None and
             simulates_forwards2(topo, a, b, field=field, edge_policy=edge_policy)
                 is None)
 
-def simulates_forwards(a, b, field='vlan', edge_policy={}):
+def simulates_forwards(topo, a, b, field='vlan', edge_policy={}):
     """Determine if b simulates a up to field on one hop."""
     p, pp = Consts('p pp', Packet)
     v, vv = Ints('v vv')
@@ -175,6 +175,7 @@ def simulates_forwards(a, b, field='vlan', edge_policy={}):
     set_option('WARNING', False)
 
     solv = Solver()
+    solv.add(on_valid_port(topo, p))
 
     # b doesn't need to forward packets on external links that don't satisfy the
     # ingress predicate
@@ -193,7 +194,7 @@ def simulates_forwards(a, b, field='vlan', edge_policy={}):
         set_option('WARNING', True)
         return solv.model(), (p, pp), HEADER_INDEX
 
-def simulates_observes(a, b, field='vlan', edge_policy={}):
+def simulates_observes(topo, a, b, field='vlan', edge_policy={}):
     p = Const('p', Packet)
     o, v = Ints('o v')
     # Z3 emits a warning about not finding a pattern for our quantification.
@@ -201,6 +202,8 @@ def simulates_observes(a, b, field='vlan', edge_policy={}):
     set_option('WARNING', False)
 
     solv = Solver()
+
+    solv.add(on_valid_port(topo, p))
 
     # b doesn't need to observe packets on external links that don't satisfy the
     # ingress predicate
@@ -230,6 +233,8 @@ def simulates_forwards2(topo, a, b, field='vlan', edge_policy={}):
     set_option('WARNING', False)
 
     solv = Solver()
+
+    solv.add(on_valid_port(topo, p))
 
     # b doesn't need to forward packets on external links that don't satisfy the
     # ingress predicate, but we only care about the first hop

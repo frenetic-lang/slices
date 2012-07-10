@@ -155,14 +155,10 @@ def main():
         # Not None because we're not doing output restrictions
         assert sat.shared_transit(topo, policy1, policy2) is not None
         iso_t = time.time()
-
         print 'Time to check isolation:   %f' % (iso_t - init)
+
         init = time.time()
-        assert sat.simulates_forwards(policy, compiled[0]) is None
-        assert sat.simulates_observes(policy, compiled[0]) is None
-        assert sat.simulates_forwards2(topo, policy, compiled[0]) is None
-        assert sat.simulates(topo, compiled[0], policy)
-        assert sat.one_per_edge(topo, compiled[0]) is None
+        assert sat.compiled_correctly(topo, policy, compiled[0], edge_policy=combined[0][0].edge_policy)
         comp_t = time.time()
         print 'Time to check compilation: %f' % (comp_t - init)
 

@@ -57,6 +57,14 @@ def nary_and(constraints):
     else:
         return And(*constraints)
 
+def on_valid_port(topo, packet):
+    constraints = []
+    for node in topo.nodes():
+        for p in topo.node[node]['port']:
+            constraints.append(And(switch(packet) == node,
+                                   port(packet) == p))
+    return nary_or(constraints)
+
 def equiv_modulo(fields, p1, p2):
     """Return a predicate testing if p1 and p2 are equivalent up to fields.
 

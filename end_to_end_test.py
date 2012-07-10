@@ -350,6 +350,6 @@ class TestCompleteGraph(unittest.TestCase):
                                                  compiled[j]))
 
 if __name__ == '__main__':
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestSeparation)
-    unittest.TextTestRunner(verbosity=2).run(suite)
-    #unittest.main()
+    #suite = unittest.TestLoader().loadTestsFromTestCase(TestSeparation)
+    #unittest.TextTestRunner(verbosity=2).run(suite)
+    unittest.main()
