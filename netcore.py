@@ -30,44 +30,49 @@
 ################################################################################
 """Netcore grammar objects and related functions.
 
-For convenience, here's the grammar:
+For convenience, here's the grammar (with * arbitrary hashable types):
 
-Switch s
+Switch s      ::= *
 
-Observation obs
+Port t        ::= int
+              
+Field f       ::= switch
+                | port
+                | srcmac
+                | dstmac
+                | ethtype
+                | srcip
+                | dstip
+                | vlan
+                | protocol
+                | srcport
+                | dstport
+              
+Value v        ::= int
 
-Port t      ::= int
+Observation ob ::= *
 
-Field f     ::= switch
-              | port
-              | srcmac
-              | dstmac
-              | ethtype
-              | srcip
-              | dstip
-              | vlan
-              | protocol
-              | srcport
-              | dstport
-
-Value v     ::= int
-
-Predicate d ::= Top
-              | Bottom
-              | Header({f: v})
-   d1 + d2    | Union(d1, d2)
-   d1 & d2    | Intersection(d1, d2)
-   d1 - d2    | Difference(d1, d2)
-
-Action a    ::= Action(s, p Set, {f: v}, obs)
-
-Policy p    ::= BottomPolicy
-  d |then| a  | PrimitivePolicy(d, a)
-  p1 + p2     | PolicyUnion(p1, p2)
-  p % d       | PolicyRestriction(p, d)
+Predicate d    ::= Top
+                 | Bottom
+                 | Header({f: v})
+   d1 + d2       | Union(d1, d2)
+   d1 & d2       | Intersection(d1, d2)
+   d1 - d2       | Difference(d1, d2)
+               
+Action a       ::= Action(s, p Set, {f: v}, ob Set)
+               
+Policy p       ::= BottomPolicy
+   d |then| a    | PrimitivePolicy(d, a)
+   p1 + p2       | PolicyUnion(p1, p2)
+   p % d         | PolicyRestriction(p, d)
 
 PolicyRestriction objects are never found in policies that have been reduced by
 policy.reduce().
+
+Note that * types must be integers for SAT verification to work, and must be
+JSON-serializable (composed of strings (incl. unicode), integers, longs, floats,
+booleans, None, lists, dictionaries, and tuples) for policies including them to
+serialize to JSON.
 """
 
 from abc import ABCMeta, abstractmethod
