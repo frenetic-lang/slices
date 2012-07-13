@@ -116,8 +116,6 @@ def equivalent(policy1, policy2):
     if s.check() == unsat:
         return None
     else:
-#       explanations = [str(explain(s.model(), p, HEADER_INDEX))
-#                       for p in (p1_in, p1_out, p2_in, p2_out1, p2_out2)]
         return (s.model(), (p1_in, p1_out, p2_in, p2_out1, p2_out2),
                 HEADER_INDEX)
 
@@ -214,8 +212,6 @@ def simulates_observes(topo, a, b, field='vlan', edge_policy={}):
              ForAll([v], Not(Or(observes_with(b, p, {field: v}, o),
                                 edge_option)),
                     patterns=[])))
-
-    #import IPython.Shell; IPython.Shell.IPShellEmbed(argv=[])()
 
     if solv.check() == unsat:
         set_option('WARNING', True)
