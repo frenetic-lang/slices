@@ -30,7 +30,7 @@
 ################################################################################
 
 from z3.z3 import And, Or, Not, Function, DeclareSort, IntSort, BoolSort
-from z3.z3 import Consts, ForAll, Exists, Int, Implies, Datatype, BitVecSort
+from z3.z3 import Consts, ForAll, Exists, Int, Implies
 from netcore import HEADERS
 import netcore as nc
 
